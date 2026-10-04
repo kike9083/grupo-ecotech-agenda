@@ -57,4 +57,4 @@ PR1–PR4 exceed 400 lines; stack on `main`, each green.
 
 ## Phase 6: Docs
 
-- [ ] 6.1 README: env (D4), provisioning, run/test commands. AC: docs match contract.
+- [x] 6.1 README: env (D4), provisioning, run/test commands. AC: docs match contract.

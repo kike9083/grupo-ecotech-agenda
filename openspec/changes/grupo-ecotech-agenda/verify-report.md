@@ -188,3 +188,25 @@ Short per-finding status after the apply re-entry run; full repro/fix/evidence l
 **FAIL**
 
 Two CRITICAL spec scenarios are broken in production (login session cookie empty — F1; task creation denied for all users — F3/F3b), so the change is not archive-ready; the remaining 16/19 scenarios are compliant and gates (tsc / 168 tests / build) are green.
+
+### Re-verification (post-deploy smoke, batch 6)
+
+Ran after fix batch 6 was pushed (`503328f`) and deployed (Easypanel action `cmuu0qnkk002b07`, done 16:12:55). Targeted smoke against production — the four previously-failing findings plus search, driven through the app's real progressive-enhancement forms (multipart replay of the `$ACTION_*` envelope from a fresh `GET`).
+
+| Check | Finding | Result |
+| --- | --- | --- |
+| Login member → `303 /`, `aw_session` non-empty (398 chars), follow-up `GET /` → 200 | F1 | ✅ |
+| Login admin → `303`, `GET /admin` → 200 | F2 | ✅ |
+| `GET /admin` with member cookie → **404** | F2 | ✅ |
+| Member `POST /nueva` valid draft → `303 /?created=1` | F3 | ✅ |
+| Created doc `$permissions` = creator-only, **0 team grants** | F3b | ✅ |
+| Member home shows own doc; admin home shows all | F3b | ✅ |
+| Search `?q=<token>` → hit; `?q=xyzxyz` → "Sin resultados" | regression | ✅ |
+
+Notes:
+- The earlier `?q=SMOKE fb0a62` "miss" was a test artifact (unencoded space in the URL), not a defect; re-tested with a single token (`humoprueba`) → hit.
+- 5 stale documents from the first verify run (all owned by `agenda-qa-member-01`) plus smoke docs were deleted; `agenda.tasks` left at `total=0`. QA sessions deleted via the app; orphan keyless-login sessions remain (pre-existing, expire 2027-10-04).
+
+### Final Verdict
+
+**PASS** — all 19 scenarios compliant; F1/F2/F3/F3b confirmed fixed in production. Change is archive-ready (pending task 6.1 README).
