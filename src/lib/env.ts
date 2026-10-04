@@ -27,7 +27,9 @@ export type ServerEnv = Record<ServerEnvKey, string>;
  * counts as missing. Reads `process.env` at call time (never at module scope)
  * so values stay out of the build output for nixpacks.
  */
-export function loadEnv(source: NodeJS.ProcessEnv = process.env): ServerEnv {
+export function loadEnv(
+  source: Readonly<Record<string, string | undefined>> = process.env,
+): ServerEnv {
   const missing = SERVER_ENV_KEYS.filter((key) => !source[key]);
 
   if (missing.length > 0) {
