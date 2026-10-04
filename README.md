@@ -1,13 +1,15 @@
 # grupo-ecotech-agenda
 
 Shared team agenda for Grupo Ecotech: register tasks and requests with a date and
-time, then find them by keyword. Server-rendered Next.js app backed by a
-self-hosted Appwrite instance.
+time, capture rich-text notes, attach images/audio, and find everything by
+keyword or date range — with a month calendar view. Server-rendered Next.js app
+backed by a self-hosted Appwrite instance.
 
 ## Stack
 
 - Next.js 15 (App Router, React Server Components) + TypeScript
 - Tailwind CSS
+- Tiptap (rich-text editor) + `sanitize-html` (server-side render)
 - Vitest for unit tests
 - Appwrite (self-hosted) via `node-appwrite` — server-side only
 
@@ -25,15 +27,28 @@ browser platforms (no CORS).
 
 ```
 src/
-  app/            routes: / (list+search), /login, /nueva, /admin
-  actions/        server actions (auth, tasks)
+  app/            routes: / (list+search), /login, /nueva, /nota, /calendario, /admin
+  actions/        server actions (auth, tasks, notes, attachments)
   components/     presentational components
   lib/
     appwrite/     clients, session, login-transport, data access, errors
-    validation/   input validation
+    validation/   input validation (task, note)
     env.ts        centralized server-only env contract
   middleware.ts   cookie-presence gate
 ```
+
+### Features
+
+- **Tasks / requests** — dated records with a lifecycle status.
+- **Notes** — rich-text (sanitized on render), optional date; undated notes
+  still list, ordered by creation time.
+- **Attachments** — images and audio, up to 30 MB, streamed to the browser
+  through an authorized proxy (`/api/attachments/<fileId>`); Appwrite URLs are
+  never exposed.
+- **Search** — fulltext keyword plus an optional inclusive date range
+  (`?from=&to=`).
+- **Calendar** — a hand-rolled month grid at `/calendario` placing every dated
+  record (`?month=YYYY-MM`, `?day=YYYY-MM-DD`).
 
 ### Roles and visibility
 
@@ -71,17 +86,32 @@ Copy `.env.example` to `.env.local` and fill in the values. These are
 
 ## Provisioning
 
-The app expects an Appwrite database with a `tasks` collection and an `admins`
-team. Create them once:
+The app expects an Appwrite database with a `tasks` collection, an
+`attachments` collection, an `agenda-attachments` storage bucket, and an
+`admins` team. The additive schema (note enum value, `bodyHtml`, the
+`created_at` index, the bucket and the attachments collection) is applied by an
+idempotent script that only needs the API key:
+
+```bash
+node scripts/provision-notebook.ts   # reads APPWRITE_* from .env.local; re-run is a no-op
+```
+
+Manual equivalent, if you prefer the console:
 
 1. **Database** — one database for the agenda.
 2. **Collection `tasks`** with `documentSecurity` enabled and these attributes:
-   `type`, `title`, `description`, `date`, `time`, `status`, `ownerId`,
-   `ownerEmail`, `searchText`.
-3. **Indexes** — a key index on the date/time fields and a **fulltext** index on
-   `searchText` (keyword search relies on it).
-4. **Collection permissions** — `create("users")` and `read("team:admins")`.
-5. **Team `admins`** — add every admin user as a member.
+   `type` (enum `task,request,note`), `title`, `description`, `date`, `time`,
+   `status`, `createdBy`, `createdByEmail`, `searchText`, and optional
+   `bodyHtml` (100000).
+3. **Indexes** — a key index on the date/time fields, a **fulltext** index on
+   `searchText`, and a key index on `$createdAt` (undated-note ordering).
+4. **Bucket `agenda-attachments`** — `fileSecurity`, 30 MB, extension allow-list
+   `jpg,jpeg,png,webp,heic,webm,mp3,wav,ogg,m4a,mp4,aac`.
+5. **Collection `attachments`** — `recordId`, `fileId`, `kind` (enum
+   `image,audio`), `name`, `mimeType`, `size`, `ownerId`; unique `file_id`
+   index + `record_created` index; permissions mirror `tasks`.
+6. **Collection permissions** — `create("users")` and `read("team:admins")`.
+7. **Team `admins`** — add every admin user as a member.
 
 Record the resulting IDs in `.env.local`.
 
@@ -104,5 +134,6 @@ Nixpacks and honors `.nvmrc` for the Node version.
 ## Spec
 
 This project follows the OpenSpec workflow. The change that introduced it lives
-in `openspec/changes/grupo-ecotech-agenda/` (proposal, specs, design, tasks,
-apply progress, verification report).
+in `openspec/changes/agenda-notebook/` (proposal, specs, design, tasks, apply
+progress, verification report). Its predecessor is archived under
+`openspec/changes/archive/grupo-ecotech-agenda/`.

@@ -97,26 +97,26 @@ TDD note: config `strict_tdd: false`, but Vitest is installed (`npm test`) and t
 
 ## Phase 8: PR8 — calendar (~380)
 
-- [ ] 8.1 RED `src/lib/calendar.test.ts`: `buildMonthGrid` (leading/trailing days, placement), `gridRange`, `shiftMonth`. Specs: calendar-view#Month grid, #Month navigation. AC: pure math, fails first.
-- [ ] 8.2 GREEN `src/lib/calendar.ts`.
-- [ ] 8.3 `src/app/calendario/page.tsx` (RSC, session-guarded): parse `?month=&day=`, `Query.between('date', gridStart, gridEnd)`. Spec: calendar-view#Month grid (Dated placed/Undated excluded).
-- [ ] 8.4 `src/components/month-grid.tsx` + `src/components/day-cell.tsx`: GET links, create-from-day → `/nueva?date=`. Spec: calendar-view#Day selection.
-- [ ] 8.5 RED `src/lib/calendar.test.ts` extension: empty/loading/error copy. Spec: calendar-view#Calendar UI states. AC: empty Spanish message.
-- [ ] 8.6 `src/app/calendario/loading.tsx` + error/empty copy. AC: three states distinct.
+- [x] 8.1 RED `src/lib/calendar.test.ts`: `buildMonthGrid` (leading/trailing days, placement), `gridRange`, `shiftMonth`. Specs: calendar-view#Month grid, #Month navigation. AC: pure math, fails first.
+- [x] 8.2 GREEN `src/lib/calendar.ts`.
+- [x] 8.3 `src/app/calendario/page.tsx` (RSC, session-guarded): parse `?month=&day=`, `Query.between('date', gridStart, gridEnd)`. Spec: calendar-view#Month grid (Dated placed/Undated excluded).
+- [x] 8.4 `src/components/month-grid.tsx` + `src/components/day-cell.tsx`: GET links, create-from-day → `/nueva?date=`. Spec: calendar-view#Day selection.
+- [x] 8.5 RED `src/lib/calendar.test.ts` extension: empty/loading/error copy. Spec: calendar-view#Calendar UI states. AC: empty Spanish message.
+- [x] 8.6 `src/app/calendario/loading.tsx` + error/empty copy. AC: three states distinct.
 
 ## Phase 9: PR9 — date-filter (~360)
 
-- [ ] 9.1 RED `src/lib/search-query.test.ts` extension: parse `from`/`to`; `buildListHref` carries them; `validateDateRange` rejects malformed/`from>to`. Spec: task-search#Keyword search (Date range/Invalid range). AC: fails first.
-- [ ] 9.2 GREEN `src/lib/search-query.ts`: `from`/`to` + `validateDateRange` (Spanish inline error).
-- [ ] 9.3 RED `src/lib/appwrite/tasks.test.ts` extension: `listQueries` composes `between`/`greaterThanEqual`/`lessThanEqual` with `Query.search`. Spec: task-search (User search/Admin search/Keyword plus range).
-- [ ] 9.4 GREEN `src/lib/appwrite/tasks.ts`: extend `TaskScope` with `dateFrom`/`dateTo`.
-- [ ] 9.5 `src/components/search-form.tsx`: from/to date inputs + inline Spanish error. Spec: task-search#Invalid range.
-- [ ] 9.6 `src/app/page.tsx`: pass range + calendar entry link. Spec: task-listing#Calendar entry point.
+- [x] 9.1 RED `src/lib/search-query.test.ts` extension: parse `from`/`to`; `buildListHref` carries them; `validateDateRange` rejects malformed/`from>to`. Spec: task-search#Keyword search (Date range/Invalid range). AC: fails first.
+- [x] 9.2 GREEN `src/lib/search-query.ts`: `from`/`to` + `validateDateRange` (Spanish inline error).
+- [x] 9.3 RED `src/lib/appwrite/tasks.test.ts` extension: `listQueries` composes `between`/`greaterThanEqual`/`lessThanEqual` with `Query.search`. Spec: task-search (User search/Admin search/Keyword plus range).
+- [x] 9.4 GREEN `src/lib/appwrite/tasks.ts`: extend `TaskScope` with `dateFrom`/`dateTo`.
+- [x] 9.5 `src/components/search-form.tsx`: from/to date inputs + inline Spanish error. Spec: task-search#Invalid range.
+- [x] 9.6 `src/app/page.tsx`: pass range + calendar entry link. Spec: task-listing#Calendar entry point.
 
 ## Phase 10: PR10 — polish-deploy (~300)
 
-- [ ] 10.1 UI states/copy pass (note/attachment/calendar) Spanish. Specs: note-capture#Note UI states, calendar-view#Calendar UI states, task-search#No match.
-- [ ] 10.2 Infra (no tests possible — docs): `README.md` + `.env.example` (bucket/collection provisioning, deps, commands). AC: docs match contract.
-- [ ] 10.3 Infra (no tests possible — config): `next.config.ts` server-only `sanitize-html` handling. AC: build green.
-- [ ] 10.4 Gates: `npx tsc --noEmit`, `npm test`, `npx next build` all green. AC: gates pass.
-- [ ] 10.5 Push → Easypanel auto-deploy; live probes (note create, image/audio upload, calendar placement, range search, peer isolation). AC: success criteria met. Deferred live ops to sdd-verify.
+- [x] 10.1 UI states/copy pass (note/attachment/calendar) Spanish. Specs: note-capture#Note UI states, calendar-view#Calendar UI states, task-search#No match.
+- [x] 10.2 Infra (no tests possible — docs): `README.md` + `.env.example` (bucket/collection provisioning, deps, commands). AC: docs match contract.
+- [x] 10.3 Infra (no tests possible — config): `next.config.ts` server-only `sanitize-html` handling. AC: build green.
+- [x] 10.4 Gates: `npx tsc --noEmit`, `npm test`, `npx next build` all green. AC: gates pass.
+- [x] 10.5 Push → Easypanel auto-deploy; live probes (note create, image/audio upload, calendar placement, range search, peer isolation). AC: success criteria met. Deferred live ops to sdd-verify.
