@@ -58,8 +58,20 @@ export interface TasksConfig {
  * their own records via a `createdBy` query; admins list everything (their
  * visibility comes from the `team:admins` document permission).
  */
+/**
+ * Optional filters of the admin view (PR4 task 5.2): status, type and
+ * creator — only the admin branch of the scope can carry them; a member's
+ * scope stays owner-only, double-enforced.
+ */
+export interface TaskFilters {
+  status?: TaskStatus;
+  type?: TaskType;
+  /** Exact `createdByEmail` match — the human-facing creator filter. */
+  creatorEmail?: string;
+}
+
 export type TaskScope =
-  | { admin: true; cursorAfter?: string }
+  | { admin: true; cursorAfter?: string; filters?: TaskFilters }
   | { admin: false; ownerId: string; cursorAfter?: string };
 
 /** Read model per design D3 — no `searchText` on the wire to the UI. */
@@ -126,6 +138,18 @@ function listQueries(scope: TaskScope): string[] {
 
   if (!scope.admin) {
     queries.push(Query.equal('createdBy', scope.ownerId));
+  }
+  if (scope.admin && scope.filters !== undefined) {
+    const { status, type, creatorEmail } = scope.filters;
+    if (status !== undefined) {
+      queries.push(Query.equal('status', status));
+    }
+    if (type !== undefined) {
+      queries.push(Query.equal('type', type));
+    }
+    if (creatorEmail !== undefined) {
+      queries.push(Query.equal('createdByEmail', creatorEmail));
+    }
   }
   if (scope.cursorAfter !== undefined && scope.cursorAfter !== '') {
     queries.push(Query.cursorAfter(scope.cursorAfter));
@@ -297,18 +321,25 @@ export async function loadHomeTasks(
   return api.listTasks(scope);
 }
 
-/** Normalized `/admin?cursor=` state the admin route passes down (task 5.1). */
+/** Normalized `/admin?…` state the admin route passes down (tasks 5.1–5.2). */
 export interface AdminListParams {
   /** Cursor of the page being displayed — continuation of the current page. */
   cursor?: string;
+  /** Active `status` filter, already validated against the enum. */
+  status?: TaskStatus;
+  /** Active `type` filter, already validated against the enum. */
+  type?: TaskType;
+  /** Creator filter as typed by the admin — matched exactly on `createdByEmail`. */
+  creator?: string;
 }
 
 /**
  * Server-side results for the `/admin` route: always the full all-records
  * scope — visibility comes from the `team:admins` read permission, so NO
  * owner filter is ever added (spec `record-visibility` → "Admin read").
- * Runs through a client built from the caller's session secret, exactly like
- * the home route; the API-key client stays reserved for admin WRITES
+ * Optional status/type/creator filters narrow the query server-side. Runs
+ * through a client built from the caller's session secret, exactly like the
+ * home route; the API-key client stays reserved for admin WRITES
  * (design D2).
  */
 export async function loadAdminTasks(
@@ -317,8 +348,19 @@ export async function loadAdminTasks(
   params: AdminListParams = {},
 ): Promise<TaskPage> {
   const api = createTasksApi(deps.databasesFor(sessionSecret), deps.config);
-  const scope: TaskScope = { admin: true };
 
+  const filters: TaskFilters = {};
+  if (params.status !== undefined) {
+    filters.status = params.status;
+  }
+  if (params.type !== undefined) {
+    filters.type = params.type;
+  }
+  if (params.creator !== undefined && params.creator !== '') {
+    filters.creatorEmail = params.creator;
+  }
+
+  const scope: TaskScope = { admin: true, filters };
   const cursor = params.cursor ?? '';
   if (cursor !== '') {
     scope.cursorAfter = cursor;

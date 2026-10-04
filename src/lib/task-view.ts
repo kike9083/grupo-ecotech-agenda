@@ -71,6 +71,16 @@ export function emptyMessage(options: { searching: boolean }): string {
 }
 
 /**
+ * Empty-state copy for the admin view (PR4 task 5.2): an unfiltered empty
+ * list invites creating records, a filtered one points back at the filters.
+ */
+export function adminEmptyMessage(options: { filtered: boolean }): string {
+  return options.filtered
+    ? 'Sin resultados para los filtros aplicados.'
+    : 'No hay tareas todavía.';
+}
+
+/**
  * Builds an `/` URL from the current query state: the cursor carries the
  * next page (design D3 next-link) and `q` keeps a keyword search alive
  * across pages (spec `task-search`). Empty pieces are omitted; nothing to

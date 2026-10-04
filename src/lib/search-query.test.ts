@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildAdminHref, normalizeSearchTerm, parseHomeQuery } from './search-query';
+import {
+  buildAdminHref,
+  normalizeSearchTerm,
+  parseAdminQuery,
+  parseHomeQuery,
+} from './search-query';
 
 describe('normalizeSearchTerm', () => {
   it('trims surrounding whitespace and collapses inner runs', () => {
@@ -69,5 +74,70 @@ describe('buildAdminHref', () => {
   it('falls back to the bare admin route when there is nothing to carry', () => {
     expect(buildAdminHref({})).toBe('/admin');
     expect(buildAdminHref({ cursor: '' })).toBe('/admin');
+  });
+
+  it('keeps every active filter and the cursor in the next-page link', () => {
+    expect(
+      buildAdminHref({
+        cursor: 'doc-20',
+        status: 'open',
+        type: 'task',
+        creator: 'ana@grupoecotech.com',
+      }),
+    ).toBe(
+      '/admin?status=open&type=task&creator=ana%40grupoecotech.com&cursor=doc-20',
+    );
+  });
+
+  it('omits the filters that are not set', () => {
+    expect(buildAdminHref({ status: 'done' })).toBe('/admin?status=done');
+    expect(buildAdminHref({ creator: 'luis@grupoecotech.com' })).toBe(
+      '/admin?creator=luis%40grupoecotech.com',
+    );
+  });
+});
+
+describe('parseAdminQuery', () => {
+  it('returns neutral defaults when the admin route has no query string', () => {
+    expect(parseAdminQuery(undefined)).toEqual({
+      cursor: '',
+      creator: '',
+      filtered: false,
+    });
+  });
+
+  it('keeps valid filters, the creator and the cursor', () => {
+    expect(
+      parseAdminQuery({
+        status: 'open',
+        type: 'request',
+        creator: ' ana@grupoecotech.com ',
+        cursor: 'doc-9',
+      }),
+    ).toEqual({
+      cursor: 'doc-9',
+      status: 'open',
+      type: 'request',
+      creator: 'ana@grupoecotech.com',
+      filtered: true,
+    });
+  });
+
+  it('drops unknown status and type values instead of trusting them', () => {
+    expect(
+      parseAdminQuery({ status: 'bogus', type: 'nope', cursor: 'c1' }),
+    ).toEqual({ cursor: 'c1', creator: '', filtered: false });
+  });
+
+  it('takes the first value when a parameter repeats (Next allows arrays)', () => {
+    expect(parseAdminQuery({ status: ['done', 'open'] }).status).toBe('done');
+  });
+
+  it('treats a blank creator as no creator filter', () => {
+    expect(parseAdminQuery({ creator: '   ' })).toEqual({
+      cursor: '',
+      creator: '',
+      filtered: false,
+    });
   });
 });

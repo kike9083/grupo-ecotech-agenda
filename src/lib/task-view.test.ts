@@ -4,6 +4,7 @@ import {
   LOAD_ERROR_MESSAGE,
   NEXT_PAGE_LABEL,
   RETRY_LABEL,
+  adminEmptyMessage,
   buildListHref,
   emptyMessage,
   formatCreatedBy,
@@ -83,6 +84,20 @@ describe('emptyMessage', () => {
 
   it('shows the no-results state when a keyword search matches nothing', () => {
     expect(emptyMessage({ searching: true })).toBe('Sin resultados.');
+  });
+});
+
+describe('adminEmptyMessage (PR4 task 5.2, admin view empty states)', () => {
+  it('keeps the first-record invite when the admin list has no records at all', () => {
+    expect(adminEmptyMessage({ filtered: false })).toBe(
+      'No hay tareas todavía.',
+    );
+  });
+
+  it('points at the active filters when a filtered list matches nothing', () => {
+    expect(adminEmptyMessage({ filtered: true })).toBe(
+      'Sin resultados para los filtros aplicados.',
+    );
   });
 });
 

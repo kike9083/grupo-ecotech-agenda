@@ -13,6 +13,14 @@ export type TaskStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
 
 export const TASK_TYPES: readonly TaskType[] = ['task', 'request'];
 
+/** Every lifecycle status in transition order (spec task-registration). */
+export const TASK_STATUSES: readonly TaskStatus[] = [
+  'open',
+  'in_progress',
+  'done',
+  'cancelled',
+];
+
 export const TITLE_MAX_LENGTH = 200;
 
 export const DESCRIPTION_MAX_LENGTH = 2000;

@@ -654,3 +654,89 @@ describe('loadAdminTasks (glue for the `/admin` route, task 5.1)', () => {
     );
   });
 });
+
+describe('admin filters (PR4 task 5.2, spec record-visibility → admin view)', () => {
+  it('builds equal queries for every active filter on the admin scope', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 1, documents: [storedDocument('match')] };
+
+    await createTasksApi(fake, config).listTasks({
+      admin: true,
+      filters: {
+        status: 'open',
+        type: 'request',
+        creatorEmail: 'ana@grupoecotech.com',
+      },
+    });
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(queries).toEqual(
+      expect.arrayContaining([
+        { method: 'equal', attribute: 'status', values: ['open'] },
+        { method: 'equal', attribute: 'type', values: ['request'] },
+        {
+          method: 'equal',
+          attribute: 'createdByEmail',
+          values: ['ana@grupoecotech.com'],
+        },
+      ]),
+    );
+    expect(hasQuery(queries, 'equal', 'createdBy')).toBe(false);
+  });
+
+  it('adds no filter queries when none are set and only one when partial', async () => {
+    const unfiltered = new FakeDatabases();
+    unfiltered.nextList = { total: 0, documents: [] };
+
+    await createTasksApi(unfiltered, config).listTasks({ admin: true });
+
+    expect(
+      parsedQueries(unfiltered.listCalls[0]).some(
+        (query) => query.method === 'equal',
+      ),
+    ).toBe(false);
+
+    const partial = new FakeDatabases();
+    partial.nextList = { total: 0, documents: [] };
+
+    await createTasksApi(partial, config).listTasks({
+      admin: true,
+      filters: { status: 'done' },
+    });
+
+    expect(
+      parsedQueries(partial.listCalls[0]).filter(
+        (query) => query.method === 'equal',
+      ),
+    ).toEqual([{ method: 'equal', attribute: 'status', values: ['done'] }]);
+  });
+
+  it('passes the admin route filters and cursor down into the data layer', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 1, documents: [storedDocument('m')] };
+
+    await loadAdminTasks(
+      'cookie-secret',
+      { config, databasesFor: () => fake },
+      {
+        cursor: 'doc-7',
+        status: 'in_progress',
+        type: 'task',
+        creator: 'luis@grupoecotech.com',
+      },
+    );
+
+    expect(parsedQueries(fake.listCalls[0])).toEqual(
+      expect.arrayContaining([
+        { method: 'cursorAfter', values: ['doc-7'] },
+        { method: 'equal', attribute: 'status', values: ['in_progress'] },
+        { method: 'equal', attribute: 'type', values: ['task'] },
+        {
+          method: 'equal',
+          attribute: 'createdByEmail',
+          values: ['luis@grupoecotech.com'],
+        },
+      ]),
+    );
+  });
+});

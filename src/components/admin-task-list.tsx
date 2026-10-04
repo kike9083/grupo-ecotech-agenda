@@ -1,10 +1,10 @@
 import type { TaskPage } from '@/lib/appwrite/tasks';
-import { buildAdminHref } from '@/lib/search-query';
+import { buildAdminHref, type AdminQuery } from '@/lib/search-query';
 import {
   LOAD_ERROR_MESSAGE,
   NEXT_PAGE_LABEL,
   RETRY_LABEL,
-  emptyMessage,
+  adminEmptyMessage,
   formatCreatedBy,
   resolveListState,
   statusLabel,
@@ -16,17 +16,25 @@ import {
  * "Admin view attribution"): every row shows its creator, with the three
  * distinct states (error + retry, empty, results) resolved by the tested
  * helpers in `task-view.ts` — this component is validated by `tsc`/`next
- * build`. Pagination links go through `buildAdminHref` so they stay on the
- * admin route.
+ * build`. Pagination and retry links carry the active filters across pages
+ * via `buildAdminHref` (PR4 task 5.2), and the empty state distinguishes an
+ * unfiltered list from a filtered one.
  */
 interface AdminTaskListProps {
   page: TaskPage | null;
-  /** Cursor of the page currently displayed — used to rebuild the retry URL. */
-  cursor: string;
+  /** Normalized `/admin` query — cursor + active filters. */
+  query: AdminQuery;
 }
 
-export function AdminTaskList({ page, cursor }: AdminTaskListProps) {
+export function AdminTaskList({ page, query }: AdminTaskListProps) {
   const state = resolveListState(page);
+  const linkTo = (cursor: string): string =>
+    buildAdminHref({
+      cursor,
+      status: query.status,
+      type: query.type,
+      creator: query.creator,
+    });
 
   if (state.kind === 'error') {
     return (
@@ -35,7 +43,7 @@ export function AdminTaskList({ page, cursor }: AdminTaskListProps) {
           {LOAD_ERROR_MESSAGE}
         </p>
         <a
-          href={buildAdminHref({ cursor })}
+          href={linkTo(query.cursor)}
           className="text-sm font-medium text-red-800 underline"
         >
           {RETRY_LABEL}
@@ -47,7 +55,7 @@ export function AdminTaskList({ page, cursor }: AdminTaskListProps) {
   if (state.kind === 'empty') {
     return (
       <p className="text-sm text-neutral-500">
-        {emptyMessage({ searching: false })}
+        {adminEmptyMessage({ filtered: query.filtered })}
       </p>
     );
   }
@@ -89,7 +97,7 @@ export function AdminTaskList({ page, cursor }: AdminTaskListProps) {
       {nextCursor !== null ? (
         <div className="flex justify-center">
           <a
-            href={buildAdminHref({ cursor: nextCursor })}
+            href={linkTo(nextCursor)}
             rel="next"
             className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium"
           >

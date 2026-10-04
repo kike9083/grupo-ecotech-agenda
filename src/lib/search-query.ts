@@ -1,10 +1,19 @@
 /**
- * Home-route query parsing (PR3 task 4.2, spec `task-search`).
+ * Home-route query parsing (PR3 task 4.2, spec `task-search`) and admin-route
+ * query parsing (PR4 task 5.2, spec `record-visibility` → admin view).
  *
- * The `/?q=&cursor=&created=` URL is the single source of truth for the list:
- * server-side search (no client state), cursor pagination, and the create
- * success banner. Pure functions — unit-tested in the node environment.
+ * The `/?q=&cursor=&created=` and `/admin?status=&type=&creator=&cursor=`
+ * URLs are the single source of truth for their lists: server-side search
+ * and filters (no client state), cursor pagination, and the create success
+ * banner. Pure functions — unit-tested in the node environment.
  */
+
+import {
+  TASK_STATUSES,
+  TASK_TYPES,
+  type TaskStatus,
+  type TaskType,
+} from '@/lib/validation/task';
 
 /** Shape Next.js hands to a page for `searchParams` (repeated keys become arrays). */
 export type RawSearchParams = Record<string, string | string[] | undefined>;
@@ -51,12 +60,65 @@ export function parseHomeQuery(params: RawSearchParams | undefined): HomeQuery {
 }
 
 /**
- * Builds an `/admin` URL from the current list state (PR4 task 5.1): the
- * cursor carries the next page of the all-records view. Empty pieces are
- * omitted; nothing to carry collapses to the bare route.
+ * Normalized `/admin` query state (PR4 task 5.2): the three filters are
+ * validated against their enums (unknown values are dropped, never trusted),
+ * the creator is trimmed, and `filtered` tells the view whether any filter
+ * actually narrows the list — that flag drives the empty state.
  */
-export function buildAdminHref(params: { cursor?: string }): string {
+export interface AdminQuery {
+  cursor: string;
+  status?: TaskStatus;
+  type?: TaskType;
+  creator: string;
+  filtered: boolean;
+}
+
+export function parseAdminQuery(
+  params: RawSearchParams | undefined,
+): AdminQuery {
+  const cursor = firstValue(params?.cursor).trim();
+  const statusRaw = firstValue(params?.status);
+  const typeRaw = firstValue(params?.type);
+  const creator = firstValue(params?.creator).trim();
+
+  const status = TASK_STATUSES.includes(statusRaw as TaskStatus)
+    ? (statusRaw as TaskStatus)
+    : undefined;
+  const type = TASK_TYPES.includes(typeRaw as TaskType)
+    ? (typeRaw as TaskType)
+    : undefined;
+
+  return {
+    cursor,
+    status,
+    type,
+    creator,
+    filtered: status !== undefined || type !== undefined || creator !== '',
+  };
+}
+
+/**
+ * Builds an `/admin` URL from the current list state (PR4 tasks 5.1–5.2):
+ * the cursor carries the next page and the active filters survive across
+ * pages (spec `record-visibility` → admin view). Empty pieces are omitted;
+ * nothing to carry collapses to the bare route.
+ */
+export function buildAdminHref(params: {
+  cursor?: string;
+  status?: TaskStatus;
+  type?: TaskType;
+  creator?: string;
+}): string {
   const query = new URLSearchParams();
+  if (params.status !== undefined) {
+    query.set('status', params.status);
+  }
+  if (params.type !== undefined) {
+    query.set('type', params.type);
+  }
+  if (params.creator !== undefined && params.creator !== '') {
+    query.set('creator', params.creator);
+  }
   if (params.cursor !== undefined && params.cursor !== '') {
     query.set('cursor', params.cursor);
   }
