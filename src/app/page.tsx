@@ -22,7 +22,7 @@ import {
   isAdmin,
 } from '@/lib/appwrite/session';
 import { loadHomeTasks, type TaskPage } from '@/lib/appwrite/tasks';
-import { parseHomeQuery, type RawSearchParams } from '@/lib/search-query';
+import { parseHomeQuery, validateDateRange, type RawSearchParams } from '@/lib/search-query';
 
 /**
  * The data region of the home route, wrapped in its own <Suspense> (verify
@@ -38,12 +38,16 @@ async function HomeTasksSection({
   secret,
   admin,
   q,
+  from,
+  to,
   cursor,
 }: {
   user: { id: string; email: string };
   secret: string;
   admin: boolean;
   q: string;
+  from: string;
+  to: string;
   cursor: string;
 }) {
   const env = loadEnv();
@@ -63,7 +67,7 @@ async function HomeTasksSection({
         databasesFor: (sessionSecret) =>
           new Databases(createSessionClient(sessionSecret)),
       },
-      { q, cursor },
+      { q, cursor, from, to },
     );
   } catch (error) {
     if (isDomainError(error) && error.kind === 'session-expired') {
@@ -102,6 +106,8 @@ async function HomeTasksSection({
     <TaskList
       page={page}
       q={q}
+      from={from}
+      to={to}
       cursor={cursor}
       attachmentsByRecord={attachmentsByRecord}
     />
@@ -132,8 +138,17 @@ export default async function HomePage({
     redirect('/login?error=expired');
   }
 
-  const { q, cursor, created, noted } = parseHomeQuery(await searchParams);
+  const { q, from, to, cursor, created, noted } = parseHomeQuery(
+    await searchParams,
+  );
   const admin = await isAdmin();
+
+  // An invalid range never runs a query (spec task-search → Invalid range):
+  // the form shows the inline error and the list falls back to the plain data.
+  const range = validateDateRange(from, to);
+  const rangeValid = range.ok;
+  const queryFrom = rangeValid ? from : '';
+  const queryTo = rangeValid ? to : '';
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-12">
@@ -151,6 +166,12 @@ export default async function HomePage({
             className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white"
           >
             Nueva nota
+          </Link>
+          <Link
+            href="/calendario"
+            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+          >
+            Calendario
           </Link>
           {admin ? (
             <Link
@@ -194,16 +215,24 @@ export default async function HomePage({
         </p>
       ) : null}
 
-      <SearchForm q={q} />
-      <Suspense fallback={<LoadingState />}>
-        <HomeTasksSection
-          user={user}
-          secret={secret}
-          admin={admin}
-          q={q}
-          cursor={cursor}
-        />
-      </Suspense>
+      <SearchForm q={q} from={from} to={to} />
+      {rangeValid ? (
+        <Suspense fallback={<LoadingState />}>
+          <HomeTasksSection
+            user={user}
+            secret={secret}
+            admin={admin}
+            q={q}
+            from={queryFrom}
+            to={queryTo}
+            cursor={cursor}
+          />
+        </Suspense>
+      ) : (
+        <p className="text-sm text-neutral-500">
+          Corrige el rango de fechas para ver resultados.
+        </p>
+      )}
     </main>
   );
 }

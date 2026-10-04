@@ -11,6 +11,7 @@
 import {
   TASK_STATUSES,
   TASK_TYPES,
+  isRealCalendarDate,
   type TaskStatus,
   type TaskType,
 } from '@/lib/validation/task';
@@ -21,6 +22,10 @@ export type RawSearchParams = Record<string, string | string[] | undefined>;
 export interface HomeQuery {
   /** Normalized keyword; empty means "plain list" (spec task-search). */
   q: string;
+  /** Inclusive lower date bound (`YYYY-MM-DD`); empty when unset. */
+  from: string;
+  /** Inclusive upper date bound (`YYYY-MM-DD`); empty when unset. */
+  to: string;
   /** Cursor of the page being displayed; empty on the first page. */
   cursor: string;
   /** True only when `q` survived normalization — drives the no-results state. */
@@ -48,18 +53,61 @@ export function normalizeSearchTerm(raw: string): string {
   return raw.trim().replace(/\s+/g, ' ');
 }
 
-/** Reads the home route's query string into a normalized, ready-to-use state. */
+/**
+ * Reads the home route's query string into a normalized, ready-to-use state.
+ * The optional `from`/`to` bounds are kept only when they are real ISO dates —
+ * malformed input is dropped (the form shows the inline error separately).
+ */
 export function parseHomeQuery(params: RawSearchParams | undefined): HomeQuery {
   const q = normalizeSearchTerm(firstValue(params?.q));
   const cursor = firstValue(params?.cursor).trim();
+  const from = normalizeDateParam(firstValue(params?.from));
+  const to = normalizeDateParam(firstValue(params?.to));
 
   return {
     q,
+    from,
+    to,
     cursor,
     searching: q !== '',
     created: firstValue(params?.created) === '1',
     noted: firstValue(params?.noted) === '1',
   };
+}
+
+/** Trims a date parameter and drops it unless it is a real calendar date. */
+function normalizeDateParam(value: string): string {
+  const raw = value.trim();
+  return isRealCalendarDate(raw) ? raw : '';
+}
+
+/**
+ * Inclusive date-range validation for the search form (PR9 task 9.2, spec
+ * `task-search` → "Invalid range"): a malformed bound or `from > to` yields a
+ * Spanish inline error and the caller runs no query. Both empty, or a single
+ * bound, is a valid (partially) open range.
+ */
+export type DateRangeValidation = { ok: true } | { ok: false; error: string };
+
+export function validateDateRange(
+  from: string,
+  to: string,
+): DateRangeValidation {
+  const hasFrom = from !== '';
+  const hasTo = to !== '';
+
+  if ((hasFrom && !isRealCalendarDate(from)) || (hasTo && !isRealCalendarDate(to))) {
+    return { ok: false, error: 'Las fechas deben tener el formato AAAA-MM-DD.' };
+  }
+
+  if (hasFrom && hasTo && from > to) {
+    return {
+      ok: false,
+      error: 'La fecha "desde" no puede ser posterior a la fecha "hasta".',
+    };
+  }
+
+  return { ok: true };
 }
 
 /**

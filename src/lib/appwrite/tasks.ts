@@ -330,6 +330,10 @@ export interface HomeListParams {
   q?: string;
   /** Cursor of the page being displayed — continuation of the current page. */
   cursor?: string;
+  /** Inclusive lower date bound (`YYYY-MM-DD`) — composes with `q` (task 9.3). */
+  from?: string;
+  /** Inclusive upper date bound (`YYYY-MM-DD`) — composes with `q` (task 9.3). */
+  to?: string;
 }
 
 /**
@@ -357,6 +361,15 @@ export async function loadHomeTasks(
   const cursor = params.cursor ?? '';
   if (cursor !== '') {
     scope.cursorAfter = cursor;
+  }
+
+  // Inclusive date range (design D5): composes with the keyword below —
+  // Appwrite ANDs the `search` and `between`/comparison queries.
+  if (params.from !== undefined && params.from !== '') {
+    scope.dateFrom = params.from;
+  }
+  if (params.to !== undefined && params.to !== '') {
+    scope.dateTo = params.to;
   }
 
   const term = (params.q ?? '').trim();

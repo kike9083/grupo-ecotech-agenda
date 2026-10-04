@@ -819,6 +819,102 @@ describe('admin filters (PR4 task 5.2, spec record-visibility → admin view)', 
   });
 });
 
+describe('home date-range filter (PR9 task 9.3, spec task-search → Keyword plus range)', () => {
+  it('composes the range with a keyword search on the home scope', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 1, documents: [storedDocument('hit')] };
+
+    await loadHomeTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      false,
+      { config, databasesFor: () => fake },
+      { q: 'pago', from: '2026-10-01', to: '2026-10-15' },
+    );
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(queries).toEqual(
+      expect.arrayContaining([
+        { method: 'search', attribute: 'searchText', values: ['pago'] },
+        {
+          method: 'between',
+          attribute: 'date',
+          values: ['2026-10-01', '2026-10-15'],
+        },
+        { method: 'equal', attribute: 'createdBy', values: ['user-123'] },
+      ]),
+    );
+  });
+
+  it('applies the range to the plain list when there is no keyword', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 0, documents: [] };
+
+    await loadHomeTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      false,
+      { config, databasesFor: () => fake },
+      { from: '2026-10-01', to: '2026-10-15' },
+    );
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(hasQuery(queries, 'search')).toBe(false);
+    expect(queries).toEqual(
+      expect.arrayContaining([
+        {
+          method: 'between',
+          attribute: 'date',
+          values: ['2026-10-01', '2026-10-15'],
+        },
+      ]),
+    );
+  });
+
+  it('uses a single-bound comparison when only one end is set', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 0, documents: [] };
+
+    await loadHomeTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      false,
+      { config, databasesFor: () => fake },
+      { from: '2026-10-01' },
+    );
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(queries).toEqual(
+      expect.arrayContaining([
+        {
+          method: 'greaterThanEqual',
+          attribute: 'date',
+          values: ['2026-10-01'],
+        },
+      ]),
+    );
+    expect(hasQuery(queries, 'between', 'date')).toBe(false);
+  });
+
+  it('adds no date query when no bounds are given', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 0, documents: [] };
+
+    await loadHomeTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      false,
+      { config, databasesFor: () => fake },
+      {},
+    );
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(hasQuery(queries, 'between', 'date')).toBe(false);
+    expect(hasQuery(queries, 'greaterThanEqual', 'date')).toBe(false);
+    expect(hasQuery(queries, 'lessThanEqual', 'date')).toBe(false);
+  });
+});
+
 describe('calendar date range (PR8 task 8.3, spec calendar-view → Month grid)', () => {
   it('emits an inclusive between query when both bounds are set', async () => {
     const fake = new FakeDatabases();

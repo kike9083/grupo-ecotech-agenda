@@ -30,6 +30,10 @@ interface TaskListProps {
   page: TaskPage | null;
   /** Normalized keyword — empty means the plain list (spec task-search). */
   q: string;
+  /** Inclusive lower date bound (`YYYY-MM-DD`) carried across pages. */
+  from?: string;
+  /** Inclusive upper date bound (`YYYY-MM-DD`) carried across pages. */
+  to?: string;
   /** Cursor of the page currently displayed — used to rebuild the retry URL. */
   cursor: string;
   /** Attachments of the page's records, keyed by record id (spec attachments). */
@@ -39,11 +43,13 @@ interface TaskListProps {
 export function TaskList({
   page,
   q,
+  from = '',
+  to = '',
   cursor,
   attachmentsByRecord = {},
 }: TaskListProps) {
   const state = resolveListState(page);
-  const searching = q !== '';
+  const searching = q !== '' || from !== '' || to !== '';
 
   if (state.kind === 'error') {
     return (
@@ -52,7 +58,7 @@ export function TaskList({
           {LOAD_ERROR_MESSAGE}
         </p>
         <a
-          href={buildListHref({ cursor, q })}
+          href={buildListHref({ cursor, q, from, to })}
           className="text-sm font-medium text-red-800 underline"
         >
           {RETRY_LABEL}
@@ -135,7 +141,7 @@ export function TaskList({
       {nextCursor !== null ? (
         <div className="flex justify-center">
           <a
-            href={buildListHref({ cursor: nextCursor, q })}
+            href={buildListHref({ cursor: nextCursor, q, from, to })}
             rel="next"
             className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium"
           >

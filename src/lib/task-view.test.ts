@@ -192,4 +192,20 @@ describe('buildListHref', () => {
   it('falls back to the bare route when there is nothing to carry', () => {
     expect(buildListHref({})).toBe('/');
   });
+
+  it('carries the inclusive date range across pages (PR9 task 9.1)', () => {
+    expect(
+      buildListHref({
+        q: 'pago',
+        cursor: 'doc-20',
+        from: '2026-10-01',
+        to: '2026-10-15',
+      }),
+    ).toBe('/?q=pago&from=2026-10-01&to=2026-10-15&cursor=doc-20');
+  });
+
+  it('carries only the bound that is set', () => {
+    expect(buildListHref({ from: '2026-10-01' })).toBe('/?from=2026-10-01');
+    expect(buildListHref({ to: '2026-10-15' })).toBe('/?to=2026-10-15');
+  });
 });
