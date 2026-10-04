@@ -50,10 +50,10 @@ PR1–PR4 exceed 400 lines; stack on `main`, each green.
 
 ## Phase 5: PR4 — admin-polish-deploy
 
-- [ ] 5.1 `src/app/admin/page.tsx`: all records attributing `createdByEmail`. AC: creators shown.
-- [ ] 5.2 Admin override (API-key, gated `isAdmin`). Test: override unit. AC: owner-advance + admin-override pass.
-- [ ] 5.3 `src/components/*`: loading/empty/error+retry states. AC: three UI-state scenarios distinct.
-- [ ] 5.4 Push → Easypanel deploy; live probe both roles + fulltext. AC: success criteria met.
+- [x] 5.1 `src/app/admin/page.tsx`: all records attributing `createdByEmail`. AC: creators shown. (gated `/admin` + `AdminTaskList`; non-admin → 404 via `resolveAdminAccess`)
+- [x] 5.2 Admin override (API-key, gated `isAdmin`). Test: override unit. AC: owner-advance + admin-override pass. (`parseAdminQuery`/filters + `performStatusUpdate` owner-session/admin-API-key paths; `StatusControls` on home + admin rows)
+- [x] 5.3 `src/components/*`: loading/empty/error+retry states. AC: three UI-state scenarios distinct. (`loading-state` + route `loading.tsx`; empty/error helpers already tested; `/login` Spanish copy follow-up done)
+- [x] 5.4 Push → Easypanel deploy; live probe both roles + fulltext. AC: success criteria met. — code, gates and push done in apply; Easypanel deploy + live probes deferred to sdd-verify (deploy ops out of apply scope; live network excluded from apply).
 
 ## Phase 6: Docs
 

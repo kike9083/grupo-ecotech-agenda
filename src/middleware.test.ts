@@ -22,6 +22,20 @@ describe('middleware presence gate', () => {
     expect(response.headers.get('location')).toBe('http://localhost/login');
   });
 
+  it('gates /admin behind the session like every other non-static route (PR4)', () => {
+    const response = middleware(requestTo('/admin'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/login');
+  });
+
+  it('lets a cookie carrier reach /admin — the page gate enforces the role', () => {
+    const response = middleware(requestTo('/admin', 'aw_session=secret-value'));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('location')).toBeNull();
+  });
+
   it('lets an anonymous visitor through to /login', () => {
     const response = middleware(requestTo('/login'));
 

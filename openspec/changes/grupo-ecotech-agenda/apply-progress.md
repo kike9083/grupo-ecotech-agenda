@@ -1,10 +1,10 @@
 # Apply Progress: grupo-ecotech-agenda
 
-**Phase**: Phase 4 / PR3 — list-search-create (current, COMPLETE)
-**Mode**: Standard (batch 1) → strict TDD (batch 2 from task 2.2, batches 3–4 fully)
+**Phase**: Phase 5 / PR4 — admin-polish-deploy (current, COMPLETE — code; live ops → sdd-verify)
+**Mode**: Standard (batch 1) → strict TDD (batch 2 from task 2.2, batches 3–5 fully)
 **Artifact store**: hybrid (OpenSpec file + Engram topic `sdd/grupo-ecotech-agenda/apply-progress`)
 **Date**: 2026-10-04
-**Batches**: 1 = PR0 Appwrite provisioning (below, complete) · 2 = PR1 scaffold-auth (middle, complete) · 3 = PR2 schema-data-layer (bottom-but-one, complete) · 4 = PR3 list-search-create (bottom, complete)
+**Batches**: 1 = PR0 Appwrite provisioning (below, complete) · 2 = PR1 scaffold-auth (middle, complete) · 3 = PR2 schema-data-layer (bottom-but-one, complete) · 4 = PR3 list-search-create (middle-bottom, complete) · 5 = PR4 admin-polish-deploy (bottom, complete)
 
 ## Task Status (cumulative)
 
@@ -323,3 +323,61 @@ Only the new database `agenda` was created/modified → `DELETE /databases/agend
 
 - **PR3 COMPLETE.** Next: Phase 5 / PR4 (tasks 5.x): admin view/status UI + `loading.tsx` + `/login` Spanish copy follow-up.
 - sdd-verify (after PR4): live e2e both roles, fulltext search probe, empty-`description` create probe (batch-3 deviation 1), inline-error acceptance run — still gated on a real admin password (PR0/PR1 caveat).
+
+---
+
+# Batch 5 (PR4) — admin-polish-deploy · 2026-10-04 · COMPLETE (code; Easypanel deploy + live probes → sdd-verify)
+
+**Scope**: tasks 5.1–5.3 fully (strict TDD) + 5.4 code parts (sweep, gates, push). Out: Easypanel deploy/live-network probes (deferred to sdd-verify per apply scope), README (Phase 6).
+
+## Task Status (batch 5)
+
+- [x] 5.1 `src/app/admin/page.tsx` + `src/lib/admin-gate.ts` + `src/components/admin-task-list.tsx` + `resolveAdminAccess` test: admins-team gated all-records view with `createdByEmail` attribution; signed-in non-admin → `notFound()` (404) before any data read; Spanish `admin/not-found.tsx`. AC: creators shown.
+- [x] 5.2a Filters: `parseAdminQuery` (enum-validated status/type, trimmed creator, `filtered` flag) + `buildAdminHref` carrying filters across pages + `AdminListParams`/`loadAdminTasks` → `listQueries` `Query.equal` pushes + GET filter form on `/admin` + `adminEmptyMessage`. AC: empty vs filtered-empty distinct, pagination keeps filters.
+- [x] 5.2b Transitions: `src/lib/task-status.ts` `performStatusUpdate` (local gates: malformed/illegal → `invalid`, non-owner non-admin → `forbidden`, NO data-layer call; owner → session client, admin non-owned → API-key client per D2) + `updateStatusAction` thin adapter (`revalidatePath` on ok, redirect on session-expired, Spanish message otherwise) + `StatusControls` client form wired into home `TaskList` AND admin rows + `allowedTransitions`/`statusActionLabel` derived from `canTransition`. AC: owner-advance + admin-override pass (unit).
+- [x] 5.3 Polish: `src/lib/login-copy.ts` (`LOGIN_ERROR_MESSAGES` ES + fallback) + `/login` copy EN→ES + `loading-state` component + `src/app/loading.tsx` + `src/app/admin/loading.tsx` + admin header link on `/`. AC: three UI-state scenarios distinct (loading / empty / error+retry).
+- [x] 5.4 Code sweep: middleware `/admin` presence-gate regression ×2, env contract verified (6 `SERVER_ENV_KEYS` + `FORCE_NODE_FETCH` = 7 in `.env.example`), no `console.*` in `src`, no EN UI copy left, full gates green, pushed to `origin/main`. **Live part (Easypanel deploy, both-role probe, fulltext probe) deferred to sdd-verify.**
+
+## TDD Cycle Evidence
+
+| Task | Test file | RED (observed) | GREEN | Gates after |
+|------|-----------|----------------|-------|-------------|
+| 5.1 | `admin-gate.test.ts` + `search-query`/`tasks` glue | `Cannot resolve './admin-gate'` (1 failed suite); `TypeError: buildAdminHref is not a function` (2 failed \| 8 passed); `TypeError: loadAdminTasks is not a function` (2 failed \| 23 passed) | **132/132 (11 files)** | tsc · vitest · build `/admin ƒ` |
+| 5.2a | `search-query.test.ts`, `tasks.test.ts`, `task-view.test.ts` | 12 failed: `parseAdminQuery is not a function` ×5, `adminEmptyMessage is not a function` ×2, 2 behavioral href mismatches, `admin filters` ×3 | **144/144 (11 files)** | tsc · vitest · build green |
+| 5.2b | `task-status.test.ts` + `task-view.test.ts` | `Cannot find module './task-status'` (1 failed suite); `allowedTransitions is not a function` ×3; `statusActionLabel is not a function` ×1 | **162/162 (12 files)** | tsc · vitest · build `/admin ƒ` |
+| 5.3 | `login-copy.test.ts` | `Cannot find module './login-copy'` (1 failed suite) | **166/166 (13 files)** | tsc · vitest · build green |
+| 5.4 | `middleware.test.ts` (regression guards) | none expected — guards for existing middleware behavior, pass on addition | **168/168 (13 files)** | tsc · vitest · build `/admin ƒ` |
+
+## Commits (batch 5, all on `main`)
+
+| commit | subject | +/− | changed lines |
+|---|---|---|---|
+| `507f3e9` | feat(admin): add admins-team gated all-records view with attribution | +395 / −1 | 396 |
+| `535c975` | feat(admin): add status, type and creator filters to the admin view | +411 / −30 | 441 |
+| `f1ef707` | feat(tasks): add owner and admin status transitions on task rows | +543 / −5 | 548 |
+| `6dfaca5` | feat(ui): add Spanish login copy, loading states and admin header link | +105 / −11 | 116 |
+| (docs) | docs(openspec): record PR4 apply progress + 5.4 sweep | — | (this file + tasks.md + middleware guards) |
+| **code total** | | **+1454 / −47** | **1501** |
+
+**Budget note**: auto-forecast exceeded (chained-pr rule) — recorded per-commit as required, no stop-to-ask; each work-unit commit independently green.
+
+## Decisions recorded (5.x)
+
+1. **Signed-in non-admin on `/admin` → `notFound()` (404)**, not a redirect or 403 page: literal record-visibility ("B gets none of A's data"), no info disclosure, and `resolveAdminAccess` stays pure/testable. Spanish `admin/not-found.tsx` for UX.
+2. **Status controls on BOTH home rows and admin rows**: record-visibility "Owner write" + task-registration "Owner advances" are unreachable for non-admins if controls live only on `/admin` (404 for them).
+3. **Trust model for the status form**: hidden fields (`documentId`/`createdBy`/`from`/`to`) are server-rendered but advisory; Appwrite document permissions are the enforcement backstop; `performStatusUpdate` re-checks input/transition/ownership before ANY data-layer call. Known limitation: fields are spoofable → rejected locally, never trusted for authorization.
+4. **Creator filter = exact `Query.equal('createdByEmail')`, unindexed** — consistent with PR3's unindexed `createdBy` usage; no schema changes allowed.
+5. **GET filter form drops `cursor`** by design — applying filters always resets to the first page (intended UX).
+
+## Discoveries (batch 5 — read before verify/archive)
+
+1. **`revalidatePath` comes from `next/cache`, NOT `next/navigation`** — build failed with TS2305; only `redirect` lives in `next/navigation` inside server actions.
+2. **TS2367 on typed-union vs `''`**: `params.status !== ''` where `status?: TaskStatus` is a no-overlap comparison — enum guards only need the `undefined` check once the type is narrowed.
+3. **`useActionState` returns `[state, formAction, isPending]`** in React 19 — third element drives the `disabled` buttons on `StatusControls` without extra state.
+4. **`TASK_STATUSES` filter + `canTransition`** derives `allowedTransitions` with zero duplication — UI can never offer an illegal move because both action and UI read the same matrix.
+5. **PS 5.1 gotchas confirmed again**: `if ($?)` chaining, no `||`; Edit tool for file content over embedded shell strings.
+
+## Next
+
+- **Phase 5 code COMPLETE.** Next in workflow: **sdd-verify** — live e2e (both roles, status flows, filters, fulltext, empty-description probe, inline-error run) + Easypanel deploy (5.4 live part). Still gated on a real admin password (PR0/PR1 caveat).
+- After verify: Phase 6 README (6.1) + sdd-archive (delta-spec sync).
