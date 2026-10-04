@@ -10,6 +10,8 @@ import {
   emptyMessage,
   formatCreatedBy,
   formatNotedAt,
+  noteHeading,
+  noteSnippet,
   resolveListState,
   statusActionLabel,
   statusLabel,
@@ -154,6 +156,25 @@ describe('list error copy', () => {
     );
     expect(RETRY_LABEL).toBe('Reintentar');
     expect(NEXT_PAGE_LABEL).toBe('Cargar más');
+  });
+});
+
+describe('note list helpers (spec task-listing → includes notes)', () => {
+  it('shortens a long note snippet with an ellipsis', () => {
+    expect(noteSnippet('a'.repeat(200), 20)).toBe('a'.repeat(20) + '…');
+  });
+
+  it('keeps a short snippet untouched and trims its edges', () => {
+    expect(noteSnippet('  Acta breve  ')).toBe('Acta breve');
+  });
+
+  it('uses the title when present and falls back to the snippet', () => {
+    expect(noteHeading('Reunión', 'Acta')).toBe('Reunión');
+    expect(noteHeading('   ', 'Acta')).toBe('Acta');
+  });
+
+  it('falls back to a placeholder for an empty note', () => {
+    expect(noteHeading('', '')).toBe('Nota sin contenido');
   });
 });
 

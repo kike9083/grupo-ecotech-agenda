@@ -109,6 +109,36 @@ export function formatCreatedBy(email: string): string {
   return `Creada por: ${email}`;
 }
 
+export const NOTE_SNIPPET_MAX_LENGTH = 120;
+
+export const NOTE_EMPTY_HEADING = 'Nota sin contenido';
+
+/**
+ * One-line preview of a note body (spec `task-listing` → "includes notes"):
+ * trims the plain text and truncates it to a single line with an ellipsis.
+ */
+export function noteSnippet(
+  text: string,
+  maxLength: number = NOTE_SNIPPET_MAX_LENGTH,
+): string {
+  const normalized = text.trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength).trimEnd()}…`;
+}
+
+/**
+ * Heading for a note row: the title when the author gave one, otherwise the
+ * body snippet, otherwise a placeholder for a completely empty note.
+ */
+export function noteHeading(title: string, snippet: string): string {
+  if (title.trim() !== '') {
+    return title;
+  }
+  return snippet !== '' ? snippet : NOTE_EMPTY_HEADING;
+}
+
 /**
  * Which of the three distinct list states the page should render
  * (spec `task-listing` → "UI states"): error, empty, or results.
