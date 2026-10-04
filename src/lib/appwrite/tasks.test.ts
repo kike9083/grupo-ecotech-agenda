@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isDomainError } from './errors';
 import {
   createTasksApi,
   type DatabasesLike,
@@ -52,10 +53,20 @@ class FakeDatabases implements DatabasesLike {
   createCalls: CreateCall[] = [];
   listCalls: ListCall[] = [];
   updateCalls: UpdateCall[] = [];
+  /** When set, the next call rejects with it (one-shot), like a real failure. */
+  nextError: unknown = undefined;
   nextList: { total: number; documents: RawDocument[] } = {
     total: 0,
     documents: [],
   };
+
+  private takeError(): void {
+    if (this.nextError !== undefined) {
+      const error = this.nextError;
+      this.nextError = undefined;
+      throw error;
+    }
+  }
 
   async createDocument(
     databaseId: string,
@@ -71,6 +82,7 @@ class FakeDatabases implements DatabasesLike {
       data,
       permissions,
     });
+    this.takeError();
     return { $id: documentId, ...data };
   }
 
@@ -80,6 +92,7 @@ class FakeDatabases implements DatabasesLike {
     queries: string[] = [],
   ): Promise<{ total: number; documents: RawDocument[] }> {
     this.listCalls.push({ databaseId, collectionId, queries });
+    this.takeError();
     return this.nextList;
   }
 
@@ -90,6 +103,7 @@ class FakeDatabases implements DatabasesLike {
     data?: Record<string, unknown>,
   ): Promise<RawDocument> {
     this.updateCalls.push({ databaseId, collectionId, documentId, data });
+    this.takeError();
     // The real service returns the full document after a partial update.
     return { ...storedDocument(documentId), ...data };
   }
@@ -363,13 +377,16 @@ describe('updateStatus', () => {
     expect(updated.$id).toBe('doc-9');
   });
 
-  it('rejects an illegal transition without touching the database', async () => {
+  it('rejects an illegal transition as a typed validation error', async () => {
     const fake = new FakeDatabases();
     const api = createTasksApi(fake, config);
 
-    await expect(
-      api.updateStatus('doc-9', 'open', 'done'),
-    ).rejects.toThrow('Invalid status transition');
+    await expect(api.updateStatus('doc-9', 'open', 'done')).rejects.toMatchObject(
+      {
+        kind: 'validation',
+        message: 'Invalid status transition: open → done',
+      },
+    );
     expect(fake.updateCalls).toHaveLength(0);
   });
 
@@ -384,5 +401,74 @@ describe('updateStatus', () => {
       api.updateStatus('doc-9', 'cancelled', 'in_progress'),
     ).rejects.toThrow('Invalid status transition');
     expect(fake.updateCalls).toHaveLength(0);
+  });
+});
+
+describe('domain error mapping (task 3.3)', () => {
+  it('maps a 404 from listDocuments to not-found', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = {
+      code: 404,
+      type: 'collection_not_found',
+      message: 'Collection not found',
+    };
+    const api = createTasksApi(fake, config);
+
+    await expect(api.listTasks(adminScope)).rejects.toMatchObject({
+      kind: 'not-found',
+      message: 'Collection not found',
+    });
+  });
+
+  it('maps a rejected search query to validation', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = {
+      code: 400,
+      type: 'general_query_invalid',
+      message: 'Invalid query: Syntax error',
+    };
+    const api = createTasksApi(fake, config);
+
+    await expect(api.searchTasks('pago', ownerScope)).rejects.toMatchObject({
+      kind: 'validation',
+    });
+  });
+
+  it('maps an expired session during createTask to session-expired', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = {
+      code: 401,
+      type: 'user_session_expired',
+      message: 'Session expired',
+    };
+    const api = createTasksApi(fake, config);
+
+    const failure = await api.createTask(record).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(isDomainError(failure)).toBe(true);
+    if (isDomainError(failure)) {
+      expect(failure.kind).toBe('session-expired');
+    }
+  });
+
+  it('wraps unexpected transport failures as unknown, keeping the cause', async () => {
+    const fake = new FakeDatabases();
+    const transport = new Error('fetch failed');
+    fake.nextError = transport;
+    const api = createTasksApi(fake, config);
+
+    const failure = await api.listTasks(ownerScope).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(isDomainError(failure)).toBe(true);
+    if (isDomainError(failure)) {
+      expect(failure.kind).toBe('unknown');
+      expect(failure.cause).toBe(transport);
+    }
   });
 });

@@ -5,6 +5,7 @@ import {
   type TaskStatus,
   type TaskType,
 } from '@/lib/validation/task';
+import { DomainError, toDomainError } from './errors';
 
 /**
  * `tasks` data access (design D3): one module, an INJECTED client, zero
@@ -154,30 +155,38 @@ export function createTasksApi(
       record: TaskRecord,
       documentId: string = ID.unique(),
     ): Promise<Task> {
-      const permissions = [
-        Permission.read(Role.user(record.createdBy)),
-        Permission.write(Role.user(record.createdBy)),
-        Permission.read(Role.team(config.adminsTeamId)),
-      ];
+      try {
+        const permissions = [
+          Permission.read(Role.user(record.createdBy)),
+          Permission.write(Role.user(record.createdBy)),
+          Permission.read(Role.team(config.adminsTeamId)),
+        ];
 
-      const doc = await databases.createDocument(
-        config.databaseId,
-        config.collectionId,
-        documentId,
-        { ...record },
-        permissions,
-      );
-      return toTask(doc);
+        const doc = await databases.createDocument(
+          config.databaseId,
+          config.collectionId,
+          documentId,
+          { ...record },
+          permissions,
+        );
+        return toTask(doc);
+      } catch (error) {
+        throw toDomainError(error);
+      }
     },
 
     /** Cursor-paginated list for the caller's scope (spec `task-listing`). */
     async listTasks(scope: TaskScope): Promise<TaskPage> {
-      const result = await databases.listDocuments(
-        config.databaseId,
-        config.collectionId,
-        listQueries(scope),
-      );
-      return toPage(result);
+      try {
+        const result = await databases.listDocuments(
+          config.databaseId,
+          config.collectionId,
+          listQueries(scope),
+        );
+        return toPage(result);
+      } catch (error) {
+        throw toDomainError(error);
+      }
     },
 
     /**
@@ -186,17 +195,21 @@ export function createTasksApi(
      * `listTasks`.
      */
     async searchTasks(q: string, scope: TaskScope): Promise<TaskPage> {
-      const term = q.trim();
-      if (term === '') {
-        return this.listTasks(scope);
-      }
+      try {
+        const term = q.trim();
+        if (term === '') {
+          return this.listTasks(scope);
+        }
 
-      const result = await databases.listDocuments(
-        config.databaseId,
-        config.collectionId,
-        [Query.search('searchText', term), ...listQueries(scope)],
-      );
-      return toPage(result);
+        const result = await databases.listDocuments(
+          config.databaseId,
+          config.collectionId,
+          [Query.search('searchText', term), ...listQueries(scope)],
+        );
+        return toPage(result);
+      } catch (error) {
+        throw toDomainError(error);
+      }
     },
 
     /**
@@ -211,16 +224,24 @@ export function createTasksApi(
       to: TaskStatus,
     ): Promise<Task> {
       if (!canTransition(from, to)) {
-        throw new Error(`Invalid status transition: ${from} → ${to}`);
+        // A domain error thrown on purpose: PR3 actions branch on `kind`.
+        throw new DomainError(
+          'validation',
+          `Invalid status transition: ${from} → ${to}`,
+        );
       }
 
-      const doc = await databases.updateDocument(
-        config.databaseId,
-        config.collectionId,
-        documentId,
-        { status: to },
-      );
-      return toTask(doc);
+      try {
+        const doc = await databases.updateDocument(
+          config.databaseId,
+          config.collectionId,
+          documentId,
+          { status: to },
+        );
+        return toTask(doc);
+      } catch (error) {
+        throw toDomainError(error);
+      }
     },
   };
 }
