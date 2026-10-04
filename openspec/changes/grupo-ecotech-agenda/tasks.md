@@ -23,7 +23,7 @@ PR1–PR4 exceed 400 lines; stack on `main`, each green.
 - [x] 1.3 Appwrite REST: fulltext index `searchText`; key (`date`,`time`) desc,desc. AC: both active.
 - [x] 1.4 Appwrite REST: team `admins` (owner admin@grupoecotech.com) + first user. AC: REST login works.
 - [x] 1.5 Fulltext probe (risk #1): seed, `Query.search` hits; shrink `searchText` if rejected. AC: match logged.
-- [ ] 1.6 Easypanel `varios`: service `grupo-ecotech-agenda`, GitHub main, 6 env vars (D4), domain; deploy post-2.1. AC: healthy.
+- [x] 1.6 Easypanel `varios`: service `grupo-ecotech-agenda`, GitHub main, 6 env vars (D4), domain; deploy post-2.1. AC: healthy.
 
 ## Phase 2: PR1 — scaffold-auth (bootstrap; no tests possible pre-Vitest)
 

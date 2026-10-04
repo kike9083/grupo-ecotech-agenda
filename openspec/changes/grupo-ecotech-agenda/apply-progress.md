@@ -381,3 +381,56 @@ Only the new database `agenda` was created/modified → `DELETE /databases/agend
 
 - **Phase 5 code COMPLETE.** Next in workflow: **sdd-verify** — live e2e (both roles, status flows, filters, fulltext, empty-description probe, inline-error run) + Easypanel deploy (5.4 live part). Still gated on a real admin password (PR0/PR1 caveat).
 - After verify: Phase 6 README (6.1) + sdd-archive (delta-spec sync).
+
+
+## Task Status (batch 6 — verify re-entry: F1, F2, F3, F3b, task 1.6)
+
+| Item | Fix | Status |
+|------|-----|--------|
+| F1 login secret | New `src/lib/appwrite/login-transport.ts` + `login-transport.test.ts`; wired in `src/actions/auth.ts` | ✅ live: 303 + 398-char `aw_session` (Max-Age 86400) + `GET /` 200 |
+| F3 create denied | Infra (no code): collection `tasks` `$permissions=[create("users"), read("team:admins")]`, `documentSecurity: true` | ✅ live: member create 201, member list own-only, member GET peer 404, admin list all |
+| F3b team grant 401 | `createTask` sends `[read(user), write(user)]` only; grant moved to collection level; tests updated + triangulation test | ✅ 29/29; app e2e member `POST /nueva` → `303 /?created=1`, member home own-only, admin home all |
+| F2 `/admin` 200 | Removed `src/app/admin/loading.tsx` **and root `src/app/loading.tsx`**; home loading UX via co-located `<Suspense>`; structural guard in `admin-gate.test.ts` | ✅ live: member `/admin` 404, admin `/admin` 200, member `/` 200 |
+| Task 1.6 checkbox | `tasks.md` flipped to `[x]` (stale checkbox) | ✅ |
+
+## TDD Cycle Evidence (batch 6)
+
+| Finding | RED (observed) | GREEN (observed) | Final gates |
+|---|---|---|---|
+| F1 | `Cannot find module './login-transport'` | **8/8** `login-transport.test.ts` | tsc 0 · 178/178 · build ✓ |
+| F3b | 2 failed (team grant asserted) → **29 pass** target | **29/29** `tasks.test.ts` | tsc 0 · 178/178 · build ✓ |
+| F2 structural | `expected true to be false` (admin file), then again on root file restore | **4/4** `admin-gate.test.ts` | tsc 0 · 178/178 · build ✓ |
+| F3 | repro first (401 team grant / 201 without) — infra change, no unit test target | REST probes green | live probes below |
+
+## Test Summary (batch 6 final)
+
+- `npx tsc --noEmit` → exit 0 · `npx vitest run` → **178 passed (14 files)** (168 baseline + 8 F1 + 1 F3b + 1 F2 guard) · `npm run build` → compiled clean.
+- Live acceptance (local `next start -p 3100`, fresh build): F1 303/non-empty cookie/`GET /` 200 · F2 member 404 + admin 200 + `/` 200 · F3/F3b app e2e 303 `/?created=1` with per-role home isolation.
+- Cleanup: collection `tasks` left `total=0` (probe docs `probe-member-1`, `probe-admin-1`, `E2E F3b task` deleted).
+
+## Deviations from verify's analysis (batch 6)
+
+1. **F2 root cause is the ROOT `loading.tsx`, not only `admin/loading.tsx`** — removing only the admin segment left member `GET /admin` → 200; removing root `src/app/loading.tsx` → 404 (empirical A/B on the same build). Fix therefore removes BOTH boundaries; home UX preserved by co-located `<Suspense>` around `HomeTasksSection` (task 5.3 `LoadingState` kept in use).
+2. **F1 root cause confirmed exactly as reported**: keyless `POST /account/sessions/email` → body `secret:""` with populated `Set-Cookie: a_session_<pid>=…`; API-key request → body `secret` populated.
+3. **`record-visibility` wording**: spec text says document permissions include `team:admins` read; after F3b the team grant lives at COLLECTION level (`read("team:admins")`) — intent (admins read all) preserved, document payload is creator-only `[read(user), write(user)]`. Archive should reconcile the wording during delta-spec sync.
+4. **F3 collection-level grant is permanent product config** — `create("users")` at collection level is what makes member creates work at all (documentSecurity create requires an explicit collection-level `create` grant).
+
+## Commits (batch 6, `main`)
+
+| subject | scope |
+|---|---|
+| `fix(auth): recover Appwrite login secret from response body or cookie (F1)` | `login-transport.ts` + test + `actions/auth.ts` |
+| `fix(tasks): send creator-only document permissions on task create (F3b)` | `tasks.ts` + `tasks.test.ts` |
+| `fix(admin): drop route-level loading boundaries so member 404 reaches the wire (F2)` | admin+root `loading.tsx` removed, `page.tsx` Suspense, `loading-state.tsx`, `admin-gate.test.ts` |
+| `docs(openspec): record verify fixes F1–F3b, sync task 1.6, batch 6 progress` | `tasks.md`, `verify-report.md`, `apply-progress.md` |
+
+## Discoveries (batch 6 — read before archive)
+
+1. **A root `loading.tsx` wraps every child route's stream** — it commits 200 for `/admin` before `resolveAdminAccess → notFound()` runs; a segment-local loading file is NOT the only offender.
+2. **Appwrite `secret` is only returned when the request carries an API key** — keyless session creation still returns a usable `Set-Cookie: a_session_*`, but the SDK client discards it; the raw fetch must read the cookie as fallback (legacy `_legacy` variant ignored).
+3. **PS 5.1 native-arg quoting**: multipart values containing `{"` break `curl -F '…'` assembled inline; write value to a temp file and use `-F 'name=<file'`; query strings with `[]` need `-g` (curl globbing) and URL-encoded brackets.
+4. **React 19 progressive-enhancement forms** (`useActionState`) post `$ACTION_REF_1`/`$ACTION_1:0`/`$ACTION_KEY`, not `$ACTION_ID_*` — replay requires the exact envelope from a fresh GET.
+
+## Next
+
+- **Batch 6 code + docs COMPLETE.** Push to `main` → Easypanel auto-deploy (orchestrator monitors). Then: re-run verify on prod (F1/F2/F3/F3b acceptance), Phase 6 README (6.1), and **sdd-archive** (delta-spec sync incl. record-visibility wording above).
