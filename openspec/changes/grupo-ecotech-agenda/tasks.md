@@ -29,7 +29,7 @@ PR1–PR4 exceed 400 lines; stack on `main`, each green.
 
 - [x] 2.1 `package.json`, `next.config.ts`, `tsconfig.json`, Tailwind, `vitest.config.ts`, `src/app/layout.tsx`: toolchain bootstrap, no tests possible yet. AC: `npx next build` + `npx vitest run` exit 0.
 - [x] 2.2 `src/lib/env.ts` (D4). Test (first): `src/lib/env.test.ts`. AC: missing prod var throws.
-- [ ] 2.3 `src/lib/appwrite/{clients,session}.ts`: session/admin clients, isAdmin (`teams.list`). Test: fake clients, mocked headers. AC: no session redirects.
+- [x] 2.3 `src/lib/appwrite/{clients,session}.ts`: session/admin clients, isAdmin (`teams.list`). Test: fake clients, mocked headers. AC: no session redirects.
 - [ ] 2.4 `src/middleware.ts`: cookie-presence gate `/`↔`/login`. Test: redirect cases. AC: anonymous redirected.
 - [ ] 2.5 `src/app/login/page.tsx` + `src/actions/auth.ts`: login/logout, httpOnly `aw_session`. Test: action units. AC: cookie set/error/cleared.
 
