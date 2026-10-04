@@ -1,13 +1,20 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
-import { Databases } from 'node-appwrite';
+import { Databases, Storage } from 'node-appwrite';
 import { logout } from '@/actions/auth';
 import { LoadingState } from '@/components/loading-state';
 import { SearchForm } from '@/components/search-form';
 import { TaskList } from '@/components/task-list';
 import { loadEnv } from '@/lib/env';
-import { createSessionClient } from '@/lib/appwrite/clients';
+import {
+  ATTACHMENTS_BUCKET_ID,
+  ATTACHMENTS_COLLECTION_ID,
+  createAttachmentsApi,
+  groupAttachmentsByRecord,
+  type Attachment,
+} from '@/lib/appwrite/attachments';
+import { createAdminClient, createSessionClient } from '@/lib/appwrite/clients';
 import { isDomainError } from '@/lib/appwrite/errors';
 import {
   getSessionSecret,
@@ -66,7 +73,39 @@ async function HomeTasksSection({
     // Other failures fall through to the inline error state (spec task-listing).
   }
 
-  return <TaskList page={page} q={q} cursor={cursor} />;
+  // Attachments are secondary data (spec `attachments` → "Attachment
+  // display"): one batched session-scoped query, and a failure never hides
+  // the record list.
+  let attachmentsByRecord: Record<string, Attachment[]> = {};
+  if (page !== null && page.tasks.length > 0) {
+    try {
+      const attachments = createAttachmentsApi(
+        new Databases(createSessionClient(secret)),
+        new Storage(createAdminClient()),
+        {
+          databaseId: env.APPWRITE_DATABASE_ID,
+          bucketId: ATTACHMENTS_BUCKET_ID,
+          collectionId: ATTACHMENTS_COLLECTION_ID,
+        },
+      );
+      attachmentsByRecord = groupAttachmentsByRecord(
+        await attachments.listAttachmentsForRecords(
+          page.tasks.map((task) => task.$id),
+        ),
+      );
+    } catch {
+      // Leave the map empty — the records still render.
+    }
+  }
+
+  return (
+    <TaskList
+      page={page}
+      q={q}
+      cursor={cursor}
+      attachmentsByRecord={attachmentsByRecord}
+    />
+  );
 }
 
 /**

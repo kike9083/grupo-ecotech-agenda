@@ -115,6 +115,23 @@ function ownerPermissions(ownerId: string): string[] {
 }
 
 /**
+ * Groups a flat attachment list by `recordId` for a list page — the batched
+ * query returns every attachment in one shot and the rows look theirs up.
+ * Insertion order is preserved inside each group.
+ */
+export function groupAttachmentsByRecord(
+  attachments: Attachment[],
+): Record<string, Attachment[]> {
+  const grouped: Record<string, Attachment[]> = {};
+  for (const attachment of attachments) {
+    const bucket = grouped[attachment.recordId] ?? [];
+    bucket.push(attachment);
+    grouped[attachment.recordId] = bucket;
+  }
+  return grouped;
+}
+
+/**
  * Factory that binds injected clients to the provisioned ids. Callers inject
  * the API-key client for writes/deletes (design D3: storage ops use the API
  * key after app-level authorization) and the session client for the proxy's

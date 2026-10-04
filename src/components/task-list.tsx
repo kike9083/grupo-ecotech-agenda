@@ -1,4 +1,7 @@
 import type { TaskPage } from '@/lib/appwrite/tasks';
+import type { Attachment } from '@/lib/appwrite/attachments';
+import { AttachmentForm } from '@/components/attachment-form';
+import { AttachmentGallery } from '@/components/attachment-gallery';
 import { NoteBody } from '@/components/note-body';
 import { StatusControls } from '@/components/status-controls';
 import { plainTextFromHtml } from '@/lib/rich-text';
@@ -29,9 +32,16 @@ interface TaskListProps {
   q: string;
   /** Cursor of the page currently displayed — used to rebuild the retry URL. */
   cursor: string;
+  /** Attachments of the page's records, keyed by record id (spec attachments). */
+  attachmentsByRecord?: Record<string, Attachment[]>;
 }
 
-export function TaskList({ page, q, cursor }: TaskListProps) {
+export function TaskList({
+  page,
+  q,
+  cursor,
+  attachmentsByRecord = {},
+}: TaskListProps) {
   const state = resolveListState(page);
   const searching = q !== '';
 
@@ -110,6 +120,13 @@ export function TaskList({ page, q, cursor }: TaskListProps) {
                   }}
                 />
               )}
+
+              <div className="flex w-full flex-col gap-2 border-t border-neutral-200 pt-2">
+                <AttachmentGallery
+                  attachments={attachmentsByRecord[task.$id] ?? []}
+                />
+                <AttachmentForm recordId={task.$id} />
+              </div>
             </li>
           );
         })}

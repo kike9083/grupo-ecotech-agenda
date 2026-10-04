@@ -3,6 +3,7 @@ import {
   ATTACHMENTS_BUCKET_ID,
   ATTACHMENTS_COLLECTION_ID,
   createAttachmentsApi,
+  groupAttachmentsByRecord,
   type Attachment,
   type AttachmentDatabasesLike,
   type AttachmentStorageLike,
@@ -322,6 +323,24 @@ describe('getAttachment / getAttachmentByFileId', () => {
     const api = createAttachmentsApi(databases, new FakeStorage(), config);
 
     expect(await api.getAttachmentByFileId('nope')).toBeNull();
+  });
+});
+
+describe('groupAttachmentsByRecord (list page wiring)', () => {
+  it('groups attachments by their recordId and keeps input order', () => {
+    const grouped = groupAttachmentsByRecord([
+      { ...(storedAttachment({ recordId: 'task-1' }) as unknown as Attachment) },
+      { ...(storedAttachment({ recordId: 'task-2' }) as unknown as Attachment) },
+      { ...(storedAttachment({ recordId: 'task-1', $id: 'att-2' }) as unknown as Attachment) },
+    ]);
+
+    expect(Object.keys(grouped).sort()).toEqual(['task-1', 'task-2']);
+    expect(grouped['task-1'].map((entry) => entry.$id)).toEqual(['att-1', 'att-2']);
+    expect(grouped['task-2']).toHaveLength(1);
+  });
+
+  it('returns an empty map for no attachments', () => {
+    expect(groupAttachmentsByRecord([])).toEqual({});
   });
 });
 
