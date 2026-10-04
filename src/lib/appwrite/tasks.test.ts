@@ -85,7 +85,11 @@ class FakeDatabases implements DatabasesLike {
       permissions,
     });
     this.takeError();
-    return { $id: documentId, ...data };
+    return {
+      $id: documentId,
+      $createdAt: '2026-10-01T09:00:00.000+00:00',
+      ...data,
+    };
   }
 
   async listDocuments(
@@ -117,6 +121,7 @@ function storedDocument(
 ): RawDocument {
   return {
     $id: id,
+    $createdAt: '2026-10-01T09:00:00.000+00:00',
     type: 'task',
     title: `Task ${id}`,
     description: 'Stored description',
@@ -204,6 +209,7 @@ describe('createTask', () => {
     expect(fake.createCalls[0].documentId).toBe('fixed-doc-id');
     expect(task).toEqual({
       $id: 'fixed-doc-id',
+      $createdAt: '2026-10-01T09:00:00.000+00:00',
       type: 'task',
       title: 'Prepare invoice',
       description: 'Send the October invoice',
@@ -213,6 +219,29 @@ describe('createTask', () => {
       createdBy: 'user-123',
       createdByEmail: 'owner@example.com',
     });
+  });
+
+  it('maps the optional bodyHtml of a note into the payload and read model (spec note-capture)', async () => {
+    const fake = new FakeDatabases();
+    const api = createTasksApi(fake, config);
+
+    const note = await api.createTask({
+      type: 'note',
+      title: 'Reunión',
+      description: '',
+      date: '',
+      time: '',
+      status: 'open',
+      createdBy: 'user-123',
+      createdByEmail: 'owner@example.com',
+      bodyHtml: '<p>Acta</p>',
+      searchText: 'Reunión Acta',
+    });
+
+    expect(fake.createCalls[0].data.bodyHtml).toBe('<p>Acta</p>');
+    expect(note.type).toBe('note');
+    expect(note.bodyHtml).toBe('<p>Acta</p>');
+    expect(note.$createdAt).toBe('2026-10-01T09:00:00.000+00:00');
   });
 
   it('generates a distinct document id per create when none is given', async () => {
@@ -293,6 +322,40 @@ describe('listTasks', () => {
     expect(hasQuery(queries, 'equal', 'createdBy')).toBe(false);
     expect(hasQuery(queries, 'limit')).toBe(true);
     expect(page.tasks[0].createdBy).toBe('someone-else');
+  });
+
+  it('orders undated records by $createdAt descending (spec task-listing → Undated note listed)', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = {
+      total: 2,
+      documents: [
+        storedDocument('nueva', {
+          type: 'note',
+          title: '',
+          date: '',
+          time: '',
+          bodyHtml: '<p>Nota reciente</p>',
+        }),
+        storedDocument('vieja', {
+          type: 'note',
+          title: '',
+          date: '',
+          time: '',
+          bodyHtml: '<p>Nota vieja</p>',
+        }),
+      ],
+    };
+    const api = createTasksApi(fake, config);
+
+    const page = await api.listTasks(ownerScope);
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(queries).toEqual(
+      expect.arrayContaining([{ method: 'orderDesc', attribute: '$createdAt' }]),
+    );
+    // The undated notes still come back and keep their creation order.
+    expect(page.tasks.map((task) => task.$id)).toEqual(['nueva', 'vieja']);
+    expect(page.tasks[0].$createdAt).toBe('2026-10-01T09:00:00.000+00:00');
   });
 
   it('continues from the cursor when one is provided', async () => {

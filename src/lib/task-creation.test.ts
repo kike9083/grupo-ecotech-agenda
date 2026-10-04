@@ -43,6 +43,7 @@ function makeDeps(
       }
       return {
         $id: 'doc-1',
+        $createdAt: '2026-10-01T09:00:00.000+00:00',
         type: record.type,
         title: record.title,
         description: record.description,

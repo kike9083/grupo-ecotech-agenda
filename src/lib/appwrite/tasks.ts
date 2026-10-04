@@ -77,6 +77,8 @@ export type TaskScope =
 /** Read model per design D3 — no `searchText` on the wire to the UI. */
 export interface Task {
   $id: string;
+  /** Appwrite creation timestamp — drives the "Anotado el …" note copy. */
+  $createdAt: string;
   type: TaskType;
   title: string;
   description: string;
@@ -85,6 +87,8 @@ export interface Task {
   status: TaskStatus;
   createdBy: string;
   createdByEmail: string;
+  /** Present only on notes (spec `note-capture`); tasks/requests omit it. */
+  bodyHtml?: string;
 }
 
 export interface TaskPage {
@@ -98,6 +102,7 @@ export const PAGE_SIZE = 20;
 function toTask(doc: RawDocument): Task {
   return {
     $id: doc.$id,
+    $createdAt: typeof doc.$createdAt === 'string' ? doc.$createdAt : '',
     type: doc.type as TaskType,
     title: doc.title as string,
     description: doc.description as string,
@@ -106,6 +111,7 @@ function toTask(doc: RawDocument): Task {
     status: doc.status as TaskStatus,
     createdBy: doc.createdBy as string,
     createdByEmail: doc.createdByEmail as string,
+    ...(typeof doc.bodyHtml === 'string' ? { bodyHtml: doc.bodyHtml } : {}),
   };
 }
 
@@ -133,6 +139,9 @@ function listQueries(scope: TaskScope): string[] {
     Query.limit(PAGE_SIZE),
     Query.orderDesc('date'),
     Query.orderDesc('time'),
+    // Undated notes sort last on `date` and are ordered by creation time
+    // within that tail (spec `task-listing` → "Undated note listed").
+    Query.orderDesc('$createdAt'),
     Query.orderDesc('$id'),
   ];
 
