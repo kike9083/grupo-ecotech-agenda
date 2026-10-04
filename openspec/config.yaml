@@ -1,0 +1,70 @@
+# openspec/config.yaml — SDD bootstrap for grupo-ecotech-vanja (init, 2026-10-03)
+schema: spec-driven
+
+context: |
+  Greenfield workspace; stack declared, not inferred. Next.js 15 (App Router) + TypeScript + Tailwind, Vitest.
+  Backend: self-hosted Appwrite 1.8.x — endpoint https://varios-appwrite-techpadah.fjueze.easypanel.host/v1, project 6a0f609f002105cac0f5 ("grupo-ecotech").
+  Data: existing DBs crm-ge (6a0f615d0028be264f5b) and ecotech_sitio_web MUST NOT be reused; new database `agenda` for this change.
+  Deploy: Easypanel project `varios`, service `grupo-ecotech-agenda`, repo kike9083/grupo-ecotech-agenda (main), nixpacks, autoDeploy.
+  Style: English artifacts; conventional commits; no AI attribution in commits.
+  Testing: to be established (Vitest planned, not installed); strict_tdd disabled until a runner exists.
+  Review budget: 400 changed lines per PR; delivery strategy auto-forecast.
+
+sdd:
+  execution_mode: auto
+  artifact_store: hybrid # OpenSpec files in repo + Engram copy
+  delivery_strategy: auto-forecast
+  review_budget_lines: 400
+
+strict_tdd: false # no test runner in repo yet; re-evaluate once Vitest is installed
+
+testing:
+  status: to-be-established
+  runner: vitest
+  runner_installed: false
+  command: npx vitest run # effective only after the runner is installed
+  layers:
+    unit: planned-vitest
+    integration: none-detected
+    e2e: none-detected
+  coverage:
+    available: false
+    command: npx vitest run --coverage # requires @vitest/coverage-v8
+  quality_tools:
+    linter:
+      available: false
+      command: npx eslint . # planned
+    type_checker:
+      available: false
+      command: npx tsc --noEmit # planned
+    formatter:
+      available: false
+      command: npx prettier --check . # planned
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Respect the 400-line review budget; call out anything that likely exceeds it
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - NEVER reuse databases crm-ge or ecotech_sitio_web; model data in a new `agenda` database
+    - Backend is self-hosted Appwrite 1.8.x — do not assume Appwrite Cloud behavior
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Forecast size: include `Decision needed before apply`, `Chained PRs recommended`, and `400-line budget risk` guard lines
+  apply:
+    - Follow existing code patterns
+    - Conventional commits only; no AI attribution in commits
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
