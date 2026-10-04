@@ -13,7 +13,7 @@
 - [x] 1.3 Appwrite REST: fulltext index `searchText`; key (`date`,`time`) desc,desc — AC met (both `status: available`).
 - [x] 1.4 Appwrite REST: team `admins` (owner admin@grupoecotech.com) + first user — membership created `confirm: true`, roles `["owner"]`. Caveat: "REST login works" NOT exercised (no password in scope by instruction); deferred to orchestrator/user.
 - [x] 1.5 Fulltext probe (risk #1): seed, search hit, non-hit, delete — AC met; see probe log below. `searchText` size 700 accepted, no shrink needed.
-- [ ] 1.6 Easypanel `varios` service + env vars + domain — OUT OF SCOPE for this batch.
+- [x] 1.6 Easypanel `varios` service + env vars + domain — done by orchestrator (MCP, not sub-agent): service `grupo-ecotech-agenda` created; source GitHub `kike9083/grupo-ecotech-agenda@main` (autoDeploy NOT enabled yet — no package.json until PR1, a push now would fail the build); 6 env vars verified present (`APPWRITE_ENDPOINT`, `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY` (masked), `APPWRITE_DATABASE_ID`, `APPWRITE_TASKS_COLLECTION_ID`, `APPWRITE_ADMINS_TEAM_ID`); domain `varios-grupo-ecotech-agenda.fjueze.easypanel.host` → port 3000, HTTPS on. **PR0 COMPLETE.**
 
 ## Resources Provisioned
 
@@ -120,4 +120,6 @@ Only the new database `agenda` was created/modified → `DELETE /databases/agend
 
 ## Next
 
-- PR0 remaining: task 1.6 (Easypanel service `varios/grupo-ecotech-agenda` + 6 env vars from D4 + domain) — then Phase 2 / PR1 `scaffold-auth`.
+- **PR0 COMPLETE** (tasks 1.1–1.6 all `[x]`).
+- Phase 2 / PR1 `scaffold-auth`: toolchain bootstrap (task 2.2 = first Vitest test, TDD starts there), env module, node-appwrite clients + session cookie, middleware, `/login`.
+- After PR1 lands with package.json: enable GitHub auto-deploy on `grupo-ecotech-agenda` and first real deploy to `varios-grupo-ecotech-agenda.fjueze.easypanel.host`.
