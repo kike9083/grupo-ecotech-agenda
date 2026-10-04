@@ -42,7 +42,42 @@ export function typeLabel(type: TaskType): string {
       return 'Tarea';
     case 'request':
       return 'Solicitud';
+    case 'note':
+      return 'Nota';
   }
+}
+
+const MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+] as const;
+
+/**
+ * Spanish creation-timestamp copy for a note (spec `note-capture` → "Creation
+ * timestamp display"): "Anotado el 4 de octubre de 2026". Reads the date part
+ * of the Appwrite `$createdAt` ISO string directly (no `Date`/timezone shift)
+ * and falls back to the raw value when it is not an ISO timestamp.
+ */
+export function formatNotedAt(createdAt: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(createdAt);
+  if (match === null) {
+    return `Anotado el ${createdAt}`;
+  }
+
+  const [, year, month, day] = match;
+  const monthName = MONTHS_ES[Number(month) - 1] ?? month;
+
+  return `Anotado el ${Number(day)} de ${monthName} de ${year}`;
 }
 
 /**

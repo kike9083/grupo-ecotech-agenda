@@ -9,6 +9,7 @@ import {
   buildListHref,
   emptyMessage,
   formatCreatedBy,
+  formatNotedAt,
   resolveListState,
   statusActionLabel,
   statusLabel,
@@ -44,9 +45,28 @@ describe('statusLabel', () => {
 });
 
 describe('typeLabel', () => {
-  it('labels both record types in Spanish', () => {
+  it('labels every record type in Spanish, including notes', () => {
     expect(typeLabel('task')).toBe('Tarea');
     expect(typeLabel('request')).toBe('Solicitud');
+    expect(typeLabel('note')).toBe('Nota');
+  });
+});
+
+describe('formatNotedAt (spec note-capture → Creation timestamp display)', () => {
+  it('renders an Appwrite $createdAt timestamp in Spanish', () => {
+    expect(formatNotedAt('2026-10-04T19:38:25.692+00:00')).toBe(
+      'Anotado el 4 de octubre de 2026',
+    );
+  });
+
+  it('formats the first day of a month without a leading zero', () => {
+    expect(formatNotedAt('2026-01-01T00:00:00.000+00:00')).toBe(
+      'Anotado el 1 de enero de 2026',
+    );
+  });
+
+  it('falls back to the raw value when the timestamp is not an ISO date', () => {
+    expect(formatNotedAt('sin fecha')).toBe('Anotado el sin fecha');
   });
 });
 
