@@ -5,6 +5,8 @@ import {
   clearSessionCookie,
   getSessionSecret,
   isTeamMember,
+  performLogin,
+  performLogout,
   resolveSessionUser,
   sessionCookieOptions,
   setSessionCookie,
@@ -151,5 +153,94 @@ describe('isTeamMember', () => {
 
   it('is false when the membership list is empty', async () => {
     await expect(isTeamMember(teamsWith(), 'admins')).resolves.toBe(false);
+  });
+});
+
+describe('performLogin', () => {
+  const loginDeps = () => ({
+    createEmailPasswordSession: vi.fn(async () => ({ secret: 'new-secret' })),
+    setSessionCookie: vi.fn(async () => {}),
+    onSuccess: vi.fn(),
+    onFailure: vi.fn(),
+  });
+
+  it('stores the returned secret in the session cookie and reports success', async () => {
+    const deps = loginDeps();
+
+    await performLogin(deps, 'user@example.com', 'pw123');
+
+    expect(deps.createEmailPasswordSession).toHaveBeenCalledWith('user@example.com', 'pw123');
+    expect(deps.setSessionCookie).toHaveBeenCalledWith('new-secret');
+    expect(deps.onSuccess).toHaveBeenCalledTimes(1);
+    expect(deps.onFailure).not.toHaveBeenCalled();
+  });
+
+  it('reports a credentials failure without setting a cookie when Appwrite rejects', async () => {
+    const deps = loginDeps();
+    deps.createEmailPasswordSession.mockRejectedValue(new Error('Invalid credentials'));
+
+    await performLogin(deps, 'user@example.com', 'wrong');
+
+    expect(deps.onFailure).toHaveBeenCalledWith('credentials');
+    expect(deps.setSessionCookie).not.toHaveBeenCalled();
+    expect(deps.onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('fails with "missing" and never calls Appwrite when fields are empty', async () => {
+    const deps = loginDeps();
+
+    await performLogin(deps, '   ', '');
+
+    expect(deps.onFailure).toHaveBeenCalledWith('missing');
+    expect(deps.createEmailPasswordSession).not.toHaveBeenCalled();
+    expect(deps.setSessionCookie).not.toHaveBeenCalled();
+  });
+
+  it('trims surrounding whitespace from the email before authenticating', async () => {
+    const deps = loginDeps();
+
+    await performLogin(deps, '  user@example.com  ', 'pw123');
+
+    expect(deps.createEmailPasswordSession).toHaveBeenCalledWith('user@example.com', 'pw123');
+    expect(deps.onSuccess).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('performLogout', () => {
+  const logoutDeps = (sessionSecret: string | null) => ({
+    sessionSecret,
+    deleteSession: vi.fn(async () => {}),
+    clearSessionCookie: vi.fn(async () => {}),
+    onDone: vi.fn(),
+  });
+
+  it('deletes the Appwrite session, clears the cookie and finishes', async () => {
+    const deps = logoutDeps('current-secret');
+
+    await performLogout(deps);
+
+    expect(deps.deleteSession).toHaveBeenCalledWith('current');
+    expect(deps.clearSessionCookie).toHaveBeenCalledTimes(1);
+    expect(deps.onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the Appwrite delete when there is no session cookie', async () => {
+    const deps = logoutDeps(null);
+
+    await performLogout(deps);
+
+    expect(deps.deleteSession).not.toHaveBeenCalled();
+    expect(deps.clearSessionCookie).toHaveBeenCalledTimes(1);
+    expect(deps.onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('still clears the cookie when Appwrite rejects the delete', async () => {
+    const deps = logoutDeps('stale-secret');
+    deps.deleteSession.mockRejectedValue(new Error('Session already expired'));
+
+    await performLogout(deps);
+
+    expect(deps.clearSessionCookie).toHaveBeenCalledTimes(1);
+    expect(deps.onDone).toHaveBeenCalledTimes(1);
   });
 });

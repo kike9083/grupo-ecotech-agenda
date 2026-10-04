@@ -97,7 +97,14 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
 
   return resolveSessionUser(secret, {
     accountFor: (sessionSecret) => new Account(createSessionClient(sessionSecret)),
-    onSessionInvalid: () => clearSessionCookie(),
+    onSessionInvalid: async () => {
+      try {
+        await clearSessionCookie();
+      } catch {
+        // RSCs cannot mutate cookies; the browser clears the stale cookie via
+        // the `/login?error=expired` middleware rule instead.
+      }
+    },
   });
 });
 
@@ -111,3 +118,69 @@ export const isAdmin = cache(async (): Promise<boolean> => {
   const teams = new Teams(createSessionClient(secret));
   return isTeamMember(teams, loadEnv().APPWRITE_ADMINS_TEAM_ID);
 });
+
+/** Why a login attempt was rejected — surfaces as `?error=` on `/login`. */
+export type LoginFailureReason = 'missing' | 'credentials';
+
+/** Injectable edges of the login flow so units run with hand-written fakes (design D5). */
+export interface LoginDeps {
+  createEmailPasswordSession(email: string, password: string): Promise<{ secret: string }>;
+  setSessionCookie(secret: string): Promise<void>;
+  onSuccess(): void;
+  onFailure(reason: LoginFailureReason): void;
+}
+
+/**
+ * Login flow (spec `agenda-auth`): valid credentials → cookie set + success;
+ * wrong credentials → failure, NO cookie; empty fields → failure without
+ * ever calling Appwrite.
+ */
+export async function performLogin(
+  deps: LoginDeps,
+  email: string,
+  password: string,
+): Promise<void> {
+  const trimmedEmail = email.trim();
+
+  if (!trimmedEmail || !password) {
+    deps.onFailure('missing');
+    return;
+  }
+
+  let secret: string;
+  try {
+    ({ secret } = await deps.createEmailPasswordSession(trimmedEmail, password));
+  } catch {
+    deps.onFailure('credentials');
+    return;
+  }
+
+  await deps.setSessionCookie(secret);
+  deps.onSuccess();
+}
+
+/** Injectable edges of the logout flow. */
+export interface LogoutDeps {
+  sessionSecret: string | null;
+  deleteSession(sessionId: string): Promise<void>;
+  clearSessionCookie(): Promise<void>;
+  onDone(): void;
+}
+
+/**
+ * Logout flow (design D2): best-effort `deleteSession('current')` when a
+ * cookie exists, then ALWAYS clear the cookie — an already-expired Appwrite
+ * session must not trap the user.
+ */
+export async function performLogout(deps: LogoutDeps): Promise<void> {
+  if (deps.sessionSecret !== null) {
+    try {
+      await deps.deleteSession('current');
+    } catch {
+      // Session already invalid server-side — cookie cleanup below is enough.
+    }
+  }
+
+  await deps.clearSessionCookie();
+  deps.onDone();
+}

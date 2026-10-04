@@ -49,4 +49,29 @@ describe('middleware presence gate', () => {
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost/login');
   });
+
+  it('clears a stale cookie and serves /login when the session expired marker arrives', () => {
+    const response = middleware(requestTo('/login?error=expired', 'aw_session=stale'));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('location')).toBeNull();
+    const setCookie = response.headers.get('set-cookie') ?? '';
+    expect(setCookie).toContain('aw_session=;');
+    expect(setCookie).toContain('Expires=Thu, 01 Jan 1970');
+  });
+
+  it('does not touch cookies when /login?error=expired arrives without a cookie', () => {
+    const response = middleware(requestTo('/login?error=expired'));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('location')).toBeNull();
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('still bounces a cookie carrier away from /login for non-expired errors', () => {
+    const response = middleware(requestTo('/login?error=credentials', 'aw_session=stale'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+  });
 });
