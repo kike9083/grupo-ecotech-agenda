@@ -186,7 +186,7 @@ describe('performCreateTask', () => {
 
     await performCreateTask(
       deps,
-      { type: 'note', title: '', date: '2026-13-01', time: '9:00' },
+      { type: 'bogus', title: '', date: '2026-13-01', time: '9:00' },
       owner,
     );
 

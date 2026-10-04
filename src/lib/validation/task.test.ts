@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TASK_TYPES,
   buildSearchText,
   buildTaskRecord,
   canTransition,
@@ -32,13 +33,22 @@ describe('validateTaskDraft', () => {
     });
   });
 
-  it('rejects a type outside the task|request enum', () => {
-    const result = validateTaskDraft({ ...validDraft, type: 'note' });
+  it('rejects a type outside the known enum', () => {
+    const result = validateTaskDraft({ ...validDraft, type: 'bogus' });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.type).toBe('El tipo debe ser "task" o "request".');
+      expect(result.errors.type).toBeDefined();
     }
+  });
+
+  it('accepts type "note" as a first-class enum member (spec task-registration)', () => {
+    const result = validateTaskDraft({ ...validDraft, type: 'note' });
+
+    expect(result).toEqual({
+      ok: true,
+      value: { ...validDraft, type: 'note' },
+    });
   });
 
   it('rejects a missing type', () => {
@@ -103,7 +113,7 @@ describe('validateTaskDraft', () => {
 
   it('collects every field error in a single pass', () => {
     const result = validateTaskDraft({
-      type: 'note',
+      type: 'bogus',
       title: '',
       description: '',
       date: '2026-13-01',
@@ -223,6 +233,12 @@ describe('buildTaskRecord', () => {
       createdByEmail: 'owner@example.com',
       searchText: 'Prepare invoice Send the October invoice to the client',
     });
+  });
+});
+
+describe('TASK_TYPES (spec task-registration → type enum gains note)', () => {
+  it('lists task, request and note in order', () => {
+    expect(TASK_TYPES).toEqual(['task', 'request', 'note']);
   });
 });
 

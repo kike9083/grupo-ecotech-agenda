@@ -7,11 +7,11 @@
  * layer persists whatever `buildTaskRecord` produces.
  */
 
-export type TaskType = 'task' | 'request';
+export type TaskType = 'task' | 'request' | 'note';
 
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
 
-export const TASK_TYPES: readonly TaskType[] = ['task', 'request'];
+export const TASK_TYPES: readonly TaskType[] = ['task', 'request', 'note'];
 
 /** Every lifecycle status in transition order (spec task-registration). */
 export const TASK_STATUSES: readonly TaskStatus[] = [
@@ -55,7 +55,7 @@ export type TaskValidationResult =
 
 /** Message shown inline next to the offending field (spec `task-registration`). */
 const ERROR_MESSAGES = {
-  type: 'El tipo debe ser "task" o "request".',
+  type: 'El tipo de registro no es válido.',
   titleRequired: 'El título es obligatorio.',
   titleTooLong: `El título debe tener como máximo ${TITLE_MAX_LENGTH} caracteres.`,
   descriptionTooLong: `La descripción debe tener como máximo ${DESCRIPTION_MAX_LENGTH} caracteres.`,
@@ -67,7 +67,7 @@ const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Real calendar check: 2026-02-30 and 2025-02-29 roll over → rejected. */
-function isRealCalendarDate(value: string): boolean {
+export function isRealCalendarDate(value: string): boolean {
   const match = DATE_PATTERN.exec(value);
   if (match === null) {
     return false;
@@ -152,7 +152,11 @@ export interface TaskOwner {
   email: string;
 }
 
-/** The nine attributes stored in the `tasks` collection (design D1). */
+/**
+ * The attributes stored in the `tasks` collection (design D1). `bodyHtml` is
+ * optional and only present on notes (spec `note-capture`); tasks and requests
+ * omit it exactly as before.
+ */
 export interface TaskRecord {
   type: TaskType;
   title: string;
@@ -163,6 +167,7 @@ export interface TaskRecord {
   createdBy: string;
   createdByEmail: string;
   searchText: string;
+  bodyHtml?: string;
 }
 
 /**
