@@ -119,11 +119,19 @@ Zero 401/403 responses across every write: databases 201, collections 201/200, a
 
 Only the new database `agenda` was created/modified → `DELETE /databases/agenda` reverts this entire batch. `crm-ge` and `ecotech_sitio_web` never touched. Teams: only new team `admins` created.
 
+## Batch 2b — first production deploy (orchestrator)
+
+- Enabled `FORCE_NODE_FETCH=1` env (PR1's hard requirement) + GitHub auto-deploy + domain port 3000.
+- **Deploy attempt 1 FAILED** (`cmuthy7x3`): Nixpacks used Node 18 (default) → `npm ci` skipped `@tailwindcss/oxide-linux-x64-gnu` (engines node>=20) → `next build` "Cannot find native binding". EBADENGINE warnings confirmed vite/vitest/oxide need Node >=20.
+- **Fix**: `.nvmrc` = 22 (commit `c2bc427`) — Nixpacks reads NIXPACKS_NODE_VERSION / engines.node / .nvmrc, default is **18**.
+- **Deploy attempt 2 SUCCEEDED** (`cmuti8p5`): build green, container `running`, smoke: `GET /` → **307** `/login`, `GET /login` → **200 Next.js` on `https://varios-grupo-ecotech-agenda.fjueze.easypanel.host`.
+- **Live login still gated**: `AGENDA_ADMIN_PASSWORD` in .env.local → 401 `user_invalid_credentials` (account pre-existed with different password). Needs real credentials or a QA user before sdd-verify e2e.
+- Gotcha: Easypanel `set_env_var` is read-modify-write — parallel calls clobber (6 parallel → 3 survived). Set env vars serially.
+
 ## Next
 
-- **PR0 COMPLETE** (tasks 1.1–1.6 all `[x]`).
-- Phase 2 / PR1 `scaffold-auth`: toolchain bootstrap (task 2.2 = first Vitest test, TDD starts there), env module, node-appwrite clients + session cookie, middleware, `/login`.
-- After PR1 lands with package.json: enable GitHub auto-deploy on `grupo-ecotech-agenda` and first real deploy to `varios-grupo-ecotech-agenda.fjueze.easypanel.host`.
+- Phase 3 / PR2 `schema-data-layer` (strict TDD, mocked client) — independent of the live-login gate.
+- sdd-verify will need live login e2e: real admin password or a dedicated QA user.
 
 ---
 
