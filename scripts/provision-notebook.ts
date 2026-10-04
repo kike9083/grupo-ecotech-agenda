@@ -1,12 +1,20 @@
 /**
- * Idempotent, API-key provisioning for the agenda-notebook slice (PR1, design D1).
+ * Idempotent, API-key provisioning for the agenda-notebook slice (PR1 design
+ * D1 + PR5 design D3).
  *
  * Applies the additive `agenda.tasks` schema changes the notebook needs:
  *   1. `type` enum gains `note`                (probe A — updateEnumAttribute)
  *   2. `bodyHtml` string attribute (100000)    (rich-text body)
  *   3. `created_at` key index on `$createdAt`  (probe B — order undated notes)
  *
- * Both probes are unverified on self-hosted Appwrite 1.8.1, so each has a
+ * And the attachments storage (design D3):
+ *   4. `agenda-attachments` bucket — fileSecurity, 30 MB, extension allow-list
+ *   5. `attachments` collection — recordId/fileId/kind/name/mimeType/size/
+ *      ownerId, `file_id` unique + `record_created` indexes, permissions that
+ *      mirror `tasks` (collection `create("users")` + `read("team:admins")`,
+ *      document `read/write("user:<owner>")`).
+ *
+ * Both enum probes are unverified on self-hosted Appwrite 1.8.1, so each has a
  * documented data-safe fallback (the collection is empty at apply time):
  *   - probe A fails → delete + recreate the enum attribute
  *   - probe B fails → add a `createdAt` ISO string attribute + index on it
@@ -17,6 +25,8 @@
  * Usage: `node scripts/provision-notebook.ts`
  * Reads `APPWRITE_ENDPOINT` / `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` /
  * `APPWRITE_DATABASE_ID` / `APPWRITE_TASKS_COLLECTION_ID` from `.env.local`.
+ * The bucket/collection ids are fixed by design D3 (`agenda-attachments`,
+ * `attachments`) — no extra env vars are required.
  */
 
 import { readFileSync } from 'node:fs';
@@ -100,12 +110,36 @@ const env = loadProvisionEnv();
 
 const baseUrl = `${env.endpoint}/databases/${env.databaseId}/collections/${env.collectionId}`;
 
-async function api(
+/** Attachments resources are fixed by design D3 — no extra env vars. */
+const ATTACHMENTS_BUCKET_ID = 'agenda-attachments';
+const ATTACHMENTS_COLLECTION_ID = 'attachments';
+/** Appwrite's 30 MB cap (decimal, matching the verified precedent buckets). */
+const MAX_ATTACHMENT_BYTES = 30000000;
+/** Design D3 allow-list: images jpeg/png/webp/heic + audio webm/mp3/wav/ogg/m4a/mp4/aac. */
+const ALLOWED_EXTENSIONS = [
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'heic',
+  'webm',
+  'mp3',
+  'wav',
+  'ogg',
+  'm4a',
+  'mp4',
+  'aac',
+];
+
+const storageBucketsUrl = `${env.endpoint}/storage/buckets`;
+const attachmentsBaseUrl = `${env.endpoint}/databases/${env.databaseId}/collections/${ATTACHMENTS_COLLECTION_ID}`;
+
+async function request(
+  url: string,
   method: string,
-  path: string,
   body?: Record<string, unknown>,
 ): Promise<ApiResult> {
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await fetch(url, {
     method,
     headers: {
       'X-Appwrite-Project': env.projectId,
@@ -124,6 +158,14 @@ async function api(
   }
 
   return { status: response.status, body: parsed };
+}
+
+async function api(
+  method: string,
+  path: string,
+  body?: Record<string, unknown>,
+): Promise<ApiResult> {
+  return request(`${baseUrl}${path}`, method, body);
 }
 
 function describe(result: ApiResult): string {
@@ -190,6 +232,64 @@ async function waitForIndex(key: string): Promise<void> {
     await sleep(1000);
   }
   throw new Error(`index ${key} never reached "available"`);
+}
+
+interface CollectionAttributeSummary {
+  key: string;
+  status?: string;
+}
+
+interface CollectionIndexSummary {
+  key: string;
+  status?: string;
+}
+
+async function getAttachmentsAttributes(): Promise<CollectionAttributeSummary[]> {
+  const result = await request(`${attachmentsBaseUrl}/attributes`, 'GET');
+  if (result.status !== 200) {
+    throw new Error(`GET attachments attributes failed: ${describe(result)}`);
+  }
+  const body = result.body as { attributes?: CollectionAttributeSummary[] };
+  return body.attributes ?? [];
+}
+
+async function getAttachmentsIndexes(): Promise<CollectionIndexSummary[]> {
+  const result = await request(`${attachmentsBaseUrl}/indexes`, 'GET');
+  if (result.status !== 200) {
+    throw new Error(`GET attachments indexes failed: ${describe(result)}`);
+  }
+  const body = result.body as { indexes?: CollectionIndexSummary[] };
+  return body.indexes ?? [];
+}
+
+async function waitForAttachmentsAttribute(key: string): Promise<void> {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const attributes = await getAttachmentsAttributes();
+    const attribute = attributes.find((entry) => entry.key === key);
+    if (attribute === undefined) {
+      throw new Error(`attachments attribute ${key} disappeared while waiting`);
+    }
+    if (attribute.status === 'available') {
+      return;
+    }
+    await sleep(1000);
+  }
+  throw new Error(`attachments attribute ${key} never reached "available"`);
+}
+
+async function waitForAttachmentsIndex(key: string): Promise<void> {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const indexes = await getAttachmentsIndexes();
+    const index = indexes.find((entry) => entry.key === key);
+    if (index === undefined) {
+      throw new Error(`attachments index ${key} disappeared while waiting`);
+    }
+    if (index.status === 'available') {
+      return;
+    }
+    await sleep(1000);
+  }
+  throw new Error(`attachments index ${key} never reached "available"`);
 }
 
 interface StepOutcome {
@@ -363,6 +463,148 @@ async function ensureCreatedAtIndex(): Promise<StepOutcome> {
   };
 }
 
+/** Bucket `agenda-attachments` (design D3): fileSecurity, 30 MB, extension allow-list. */
+async function ensureAttachmentsBucket(): Promise<StepOutcome> {
+  const existing = await request(
+    `${storageBucketsUrl}/${ATTACHMENTS_BUCKET_ID}`,
+    'GET',
+  );
+  if (existing.status === 200) {
+    return {
+      step: 'bucket.agenda-attachments',
+      changed: false,
+      fallback: false,
+      detail: 'bucket already present — skipped',
+    };
+  }
+  if (existing.status !== 404) {
+    throw new Error(`GET attachments bucket failed: ${describe(existing)}`);
+  }
+
+  const created = await request(storageBucketsUrl, 'POST', {
+    bucketId: ATTACHMENTS_BUCKET_ID,
+    name: 'Agenda attachments',
+    fileSecurity: true,
+    enabled: true,
+    maximumFileSize: MAX_ATTACHMENT_BYTES,
+    allowedFileExtensions: ALLOWED_EXTENSIONS,
+    permissions: [],
+  });
+  if (created.status !== 201 && created.status !== 202) {
+    throw new Error(`createBucket failed: ${describe(created)}`);
+  }
+
+  return {
+    step: 'bucket.agenda-attachments',
+    changed: true,
+    fallback: false,
+    detail: `createBucket OK (${describe(created)})`,
+  };
+}
+
+async function ensureAttachmentAttribute(
+  key: string,
+  body: Record<string, unknown>,
+  path: string,
+): Promise<boolean> {
+  const attributes = await getAttachmentsAttributes();
+  if (attributes.some((entry) => entry.key === key)) {
+    return false;
+  }
+
+  const created = await request(`${attachmentsBaseUrl}${path}`, 'POST', body);
+  if (created.status !== 201 && created.status !== 202) {
+    throw new Error(`create ${key} attribute failed: ${describe(created)}`);
+  }
+  await waitForAttachmentsAttribute(key);
+  return true;
+}
+
+/**
+ * Collection `attachments` (design D3): permissions mirror `tasks` — any
+ * authenticated user may create a document, only the `admins` team reads
+ * everything at collection level, and each document grants its owner
+ * read/write. `documentSecurity:true` enables those per-document grants.
+ */
+async function ensureAttachmentsCollection(): Promise<StepOutcome> {
+  const existing = await request(attachmentsBaseUrl, 'GET');
+  let createdCollection = false;
+
+  if (existing.status === 404) {
+    const created = await request(
+      `${env.endpoint}/databases/${env.databaseId}/collections`,
+      'POST',
+      {
+        collectionId: ATTACHMENTS_COLLECTION_ID,
+        name: 'Attachments',
+        permissions: ['create("users")', 'read("team:admins")'],
+        documentSecurity: true,
+        enabled: true,
+      },
+    );
+    if (created.status !== 201 && created.status !== 202) {
+      throw new Error(`createCollection failed: ${describe(created)}`);
+    }
+    createdCollection = true;
+  } else if (existing.status !== 200) {
+    throw new Error(`GET attachments collection failed: ${describe(existing)}`);
+  }
+
+  const changes: string[] = [];
+
+  const attributes: Array<[string, Record<string, unknown>, string]> = [
+    ['recordId', { key: 'recordId', size: 36, required: true }, '/attributes/string'],
+    ['fileId', { key: 'fileId', size: 36, required: true }, '/attributes/string'],
+    ['kind', { key: 'kind', elements: ['image', 'audio'], required: true }, '/attributes/enum'],
+    ['name', { key: 'name', size: 255, required: true }, '/attributes/string'],
+    ['mimeType', { key: 'mimeType', size: 100, required: true }, '/attributes/string'],
+    ['size', { key: 'size', required: true, min: 0, max: MAX_ATTACHMENT_BYTES }, '/attributes/integer'],
+    ['ownerId', { key: 'ownerId', size: 36, required: true }, '/attributes/string'],
+  ];
+
+  for (const [key, body, path] of attributes) {
+    if (await ensureAttachmentAttribute(key, body, path)) {
+      changes.push(`attr:${key}`);
+    }
+  }
+
+  const indexes: Array<[string, Record<string, unknown>]> = [
+    ['file_id', { key: 'file_id', type: 'unique', attributes: ['fileId'], orders: ['asc'] }],
+    [
+      'record_created',
+      {
+        key: 'record_created',
+        type: 'key',
+        attributes: ['recordId', '$createdAt'],
+        orders: ['asc', 'asc'],
+      },
+    ],
+  ];
+
+  for (const [key, body] of indexes) {
+    const existingIndexes = await getAttachmentsIndexes();
+    if (existingIndexes.some((entry) => entry.key === key)) {
+      continue;
+    }
+    const created = await request(`${attachmentsBaseUrl}/indexes`, 'POST', body);
+    if (created.status !== 201 && created.status !== 202) {
+      throw new Error(`create ${key} index failed: ${describe(created)}`);
+    }
+    await waitForAttachmentsIndex(key);
+    changes.push(`index:${key}`);
+  }
+
+  return {
+    step: 'collection.attachments',
+    changed: changes.length > 0 || createdCollection,
+    fallback: false,
+    detail:
+      changes.length > 0
+        ? `applied ${changes.join(', ')}`
+        : 'attachments schema already present — skipped',
+  };
+}
+
 async function main(): Promise<void> {
   console.log(`Provisioning notebook schema on ${env.databaseId}.${env.collectionId}`);
   const outcomes: StepOutcome[] = [];
@@ -370,6 +612,8 @@ async function main(): Promise<void> {
   outcomes.push(await ensureNoteEnum());
   outcomes.push(await ensureBodyHtml());
   outcomes.push(await ensureCreatedAtIndex());
+  outcomes.push(await ensureAttachmentsBucket());
+  outcomes.push(await ensureAttachmentsCollection());
 
   console.log('\nProvisioning summary:');
   for (const outcome of outcomes) {
