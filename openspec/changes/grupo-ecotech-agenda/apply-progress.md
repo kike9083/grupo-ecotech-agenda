@@ -1,10 +1,10 @@
 # Apply Progress: grupo-ecotech-agenda
 
-**Phase**: Phase 3 / PR2 — schema-data-layer (current, COMPLETE)
-**Mode**: Standard (batch 1) → strict TDD (batch 2 from task 2.2, batch 3 fully)
+**Phase**: Phase 4 / PR3 — list-search-create (current, COMPLETE)
+**Mode**: Standard (batch 1) → strict TDD (batch 2 from task 2.2, batches 3–4 fully)
 **Artifact store**: hybrid (OpenSpec file + Engram topic `sdd/grupo-ecotech-agenda/apply-progress`)
 **Date**: 2026-10-04
-**Batches**: 1 = PR0 Appwrite provisioning (below, complete) · 2 = PR1 scaffold-auth (middle, complete) · 3 = PR2 schema-data-layer (bottom, complete)
+**Batches**: 1 = PR0 Appwrite provisioning (below, complete) · 2 = PR1 scaffold-auth (middle, complete) · 3 = PR2 schema-data-layer (bottom-but-one, complete) · 4 = PR3 list-search-create (bottom, complete)
 
 ## Task Status (cumulative)
 
@@ -255,3 +255,71 @@ Only the new database `agenda` was created/modified → `DELETE /databases/agend
 
 - **PR2 COMPLETE.** Next: Phase 4 / PR3 `list-search-create` (tasks 4.1–4.3, TDD): `/` list UI + search box + cursor next-link + `/nueva` form/action with inline errors — the action layer branches on `DomainError.kind` (task 3.3 output).
 - sdd-verify (after PR3/PR4): live probe both roles + fulltext; still gated on a real admin password (PR0/PR1 caveat); add empty-`description` create probe (deviation 1).
+
+---
+
+# Batch 4 — Phase 4 / PR3 `list-search-create` (COMPLETE)
+
+**Date**: 2026-10-04 · **Tasks**: 4.1–4.3 all `[x]` · **Pushed**: `main @ 682e10e` (origin `kike9083/grupo-ecotech-agenda`), tree clean
+**Mode**: STRICT TDD — every task RED (observed failing output) → GREEN → full gates → one work-unit commit per task
+**Scope**: list UI + search + create flow only. Out: admin view/status UI (PR4), `loading.tsx` (PR4 task 5.3), live-network tests (sdd-verify), `/login` copy translation (PR1 file — follow-up flagged for PR4).
+
+## Task Status (batch 4)
+
+- [x] 4.1 `src/lib/task-view.ts` + `src/components/task-list.tsx`: display helpers (`statusLabel`, `typeLabel`, `formatCreatedBy`, `resolveListState`, `emptyMessage`, `buildListHref`, `LOAD_ERROR_MESSAGE`, `RETRY_LABEL`, `NEXT_PAGE_LABEL`) + `TaskList` RSC — status/type badges, creator attribution, empty/loading/error states, cursor "Siguiente" link preserving `q`. RED `src/lib/task-view.test.ts`.
+- [x] 4.2 `src/lib/search-query.ts` + `src/components/search-form.tsx` + `loadHomeTasks(user, sessionSecret, admin, deps, params?)`: `parseHomeQuery` → `{q, cursor, searching, created}` (`RawSearchParams` pass-through), `normalizeSearchTerm`, search form with preserved input, dispatch to `searchTasks` when `q.trim() !== ''` else `listTasks` (scope `{admin:true}` / `{admin:false, ownerId}` unchanged, `cursorAfter` from cursor). RED ×3 streams (evidence below).
+- [x] 4.3 `src/app/nueva/page.tsx`, `src/actions/tasks.ts`, `src/components/task-form.tsx` + `src/lib/task-creation.ts`: `performCreateTask(deps, draft, owner)` (validate → `onInvalid` OR `createTask` → `redirect('/?created=1')`, `DomainError.session-expired` → `/login?error=expired`, other kinds → Spanish form banner), thin `'use server'` action, client form on `useActionState`, "Nueva tarea" link + success banner on `/`. AC: invalid blocked inline with NO data-layer call; past date kept unchanged.
+
+## TDD Cycle Evidence
+
+| Task | Test File | RED (observed) | GREEN | TRIANGULATE | Gates |
+|------|-----------|----------------|-------|-------------|-------|
+| 4.1 | `src/lib/task-view.test.ts` | `Error: Cannot find module './task-view'` — 1 failed suite, 0 tests | 11/11 (→13 with 4.2 additions) | badges/labels both locales, creator attribution, `resolveListState` (loading/empty/error/page), `buildListHref` q+cursor | ✅ tsc · **8 files / 102 tests** · build green |
+| 4.2 | `src/lib/search-query.test.ts` + glue in `task-view`/`tasks` | (a) `Cannot find module './search-query'`; (b) `expected '/?cursor=doc-20' to be '/?q=pago&cursor=doc-20'`; (c) `expected 'No hay tareas todavía.' to be 'Sin resultados.'`; + 2 `loadHomeTasks` glue failures | 3 files / 44 tests; full suite **115/115** | empty vs whitespace `q`, `searching` flag, cursor-only hrefs, search-vs-list dispatch + scope | ✅ tsc · 9 files / 115 · build green |
+| 4.3 | `src/lib/task-creation.test.ts` + copy asserts in `validation/task.test.ts` | (a) 7 copy failures `Expected 'El título es obligatorio.' Received 'Title is required.'`; (b) `Cannot find module './task-creation'` | 35/35 (validation 25 + flow 10); full suite **125/125** | invalid-never-touches-data-layer, success payload + `/?created=1`, past-date backfill, 4 DomainError kinds mapped, multi-field collection, `INITIAL_CREATE_STATE` | ✅ tsc · 10 files / 125 · build green ( `/nueva` ƒ 4.32 kB ) |
+
+## Test Summary
+
+- **New tests written**: 34 (task-view 13, search-query 8, task-creation 10, `tasks.test.ts` glue +3)
+- **Suite growth**: 91/91 (7 files, PR2) → **125/125 (10 files)**
+- **Copy updates (not net-new)**: 7 validation assertions EN→ES with `ERROR_MESSAGES`
+- **Layers**: all unit (node env, no jsdom — components/pages validated by `tsc`/`next build`); no live network per D5
+
+## Commits (all pushed to `main`)
+
+| commit | subject | +/− | changed lines |
+|---|---|---|---|
+| `b0fb679` | feat(app): render task list with badges, empty state and cursor next link | +295 / −28 | 323 |
+| `6b94d71` | feat(app): add server-side keyword search with cursor-preserving pagination | +297 / −26 | 323 |
+| `682e10e` | feat(app): add task creation flow with inline Spanish validation errors | +622 / −24 | 646 |
+| (docs) | docs(openspec): record PR3 apply progress batch 4 | — | (this file + tasks.md) |
+| **code total** | | **+1214 / −78** | **1292** |
+
+**Budget note**: forecast 700–1100; actual 1292 (test volume dominates — `task-creation.test.ts` 209 lines, 13-test task-view suite). Recorded per-commit per chained-pr rule under `delivery_strategy: auto-forecast`; no stop-to-ask. Mitigation: one work-unit commit per task, each independently green. Gotcha hit & fixed: `task-list.tsx` missed staging in `6b94d71`'s first attempt → commit amended pre-push (amended commits must stay self-consistent over their whole tree).
+
+## Verification evidence (green before every commit + final run)
+
+- `npx tsc --noEmit` — clean.
+- `npx vitest run` — **10 files, 125/125 passed**.
+- `npm run build` — green: `Compiled successfully`, `/` ƒ 3.42 kB, `/nueva` ƒ 4.32 kB, `/login` ƒ, Middleware 39.3 kB.
+
+## Deviations from Design / Prompt
+
+1. **No `required`/native blocking on the create form** — spec acceptance says invalid input is "blocked with an inline error" on attempted submit; native `required` would intercept before the request, making the inline-error scenario untestable at e2e. Server validation is the single source of truth (inputs keep `maxLength` caps as soft guards).
+2. **`src/lib/task-creation.ts` is a new file** not named in D3's file table — mirrors batch 2's `performLogin` so the flow is unit-testable in node env; the server action stays a thin adapter (deps injected: `createTask`/`onInvalid`/`redirect`).
+3. **`ERROR_MESSAGES` translated EN→ES** (Spanish-UI constraint wins over source comments): 7 assertions updated to Spanish — RED observed before the change.
+4. **`/login` copy still English** — PR1 file, out of PR3 scope; flagged as follow-up for PR4.
+5. **Speculative-code discipline**: untested branches (`emptyMessage` searching variant, `buildListHref` q branch) were stripped to observe genuine RED first, then implemented GREEN.
+
+## Discoveries (batch 4 — read before PR4/verify)
+
+1. **React 19 `useActionState` + `defaultValue` from returned state** is the canonical value-preservation pattern after failed submissions (verified against React docs) — no controlled-input machinery needed; the action returns `{fieldErrors, formError, values}` and the form re-renders from it.
+2. **`redirect()` returns `never`** → TS narrows null session checks after the guard (no extra assertions needed in action/page).
+3. **`'use server'` files may only export async functions** — all flow logic must live in plain lib modules with injected deps; helpers like `readDraft` stay module-local.
+4. **vitest env is `node`** — React components/RSCs cannot be unit-rendered; pattern is: pure helpers + flow functions unit-tested, components validated by `tsc --noEmit` + `next build`.
+5. **PS 5.1 gotchas hit again**: no `||` across commands (use `if ($?)`); embedded quotes in PowerShell strings mangle — prefer the Edit tool for file content.
+
+## Next
+
+- **PR3 COMPLETE.** Next: Phase 5 / PR4 (tasks 5.x): admin view/status UI + `loading.tsx` + `/login` Spanish copy follow-up.
+- sdd-verify (after PR4): live e2e both roles, fulltext search probe, empty-`description` create probe (batch-3 deviation 1), inline-error acceptance run — still gated on a real admin password (PR0/PR1 caveat).
