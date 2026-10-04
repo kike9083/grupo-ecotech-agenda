@@ -25,8 +25,10 @@ export interface HomeQuery {
   cursor: string;
   /** True only when `q` survived normalization — drives the no-results state. */
   searching: boolean;
-  /** `?created=1` marker set by the create flow's success redirect. */
+  /** `?created=1` marker set by the task create flow's success redirect. */
   created: boolean;
+  /** `?noted=1` marker set by the note create flow's success redirect. */
+  noted: boolean;
 }
 
 /** First value when a parameter repeats; `undefined` becomes the empty string. */
@@ -56,6 +58,7 @@ export function parseHomeQuery(params: RawSearchParams | undefined): HomeQuery {
     cursor,
     searching: q !== '',
     created: firstValue(params?.created) === '1',
+    noted: firstValue(params?.noted) === '1',
   };
 }
 

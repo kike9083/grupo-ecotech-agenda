@@ -93,7 +93,7 @@ export default async function HomePage({
     redirect('/login?error=expired');
   }
 
-  const { q, cursor, created } = parseHomeQuery(await searchParams);
+  const { q, cursor, created, noted } = parseHomeQuery(await searchParams);
   const admin = await isAdmin();
 
   return (
@@ -106,6 +106,12 @@ export default async function HomePage({
             className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white"
           >
             Nueva tarea
+          </Link>
+          <Link
+            href="/nota"
+            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white"
+          >
+            Nueva nota
           </Link>
           {admin ? (
             <Link
@@ -137,6 +143,15 @@ export default async function HomePage({
           className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
         >
           Tarea creada correctamente.
+        </p>
+      ) : null}
+
+      {noted ? (
+        <p
+          role="status"
+          className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
+        >
+          Nota creada correctamente.
         </p>
       ) : null}
 

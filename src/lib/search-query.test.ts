@@ -27,6 +27,7 @@ describe('parseHomeQuery', () => {
       cursor: '',
       searching: false,
       created: false,
+      noted: false,
     });
   });
 
@@ -38,6 +39,7 @@ describe('parseHomeQuery', () => {
       cursor: 'doc-20',
       searching: true,
       created: true,
+      noted: false,
     });
   });
 
@@ -47,6 +49,7 @@ describe('parseHomeQuery', () => {
       cursor: '',
       searching: false,
       created: false,
+      noted: false,
     });
   });
 
@@ -56,6 +59,7 @@ describe('parseHomeQuery', () => {
       cursor: 'a',
       searching: true,
       created: false,
+      noted: false,
     });
   });
 
@@ -63,6 +67,12 @@ describe('parseHomeQuery', () => {
     expect(parseHomeQuery({ created: '1' }).created).toBe(true);
     expect(parseHomeQuery({ created: '0' }).created).toBe(false);
     expect(parseHomeQuery({ created: 'yes' }).created).toBe(false);
+  });
+
+  it('only flags the note banner for the exact noted=1 marker', () => {
+    expect(parseHomeQuery({ noted: '1' }).noted).toBe(true);
+    expect(parseHomeQuery({ noted: '0' }).noted).toBe(false);
+    expect(parseHomeQuery({}).noted).toBe(false);
   });
 });
 
