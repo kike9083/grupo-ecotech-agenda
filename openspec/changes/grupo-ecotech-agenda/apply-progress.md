@@ -1,10 +1,10 @@
 # Apply Progress: grupo-ecotech-agenda
 
-**Phase**: Phase 1 / PR0 — Appwrite provisioning (scope of this batch)
-**Mode**: Standard (strict_tdd: false — no test runner yet)
+**Phase**: Phase 2 / PR1 — scaffold-auth (current)
+**Mode**: Standard (batch 1: strict_tdd false — no runner yet; batch 2: strict TDD from task 2.2 onward)
 **Artifact store**: hybrid (OpenSpec file + Engram topic `sdd/grupo-ecotech-agenda/apply-progress`)
 **Date**: 2026-10-04
-**Batch**: 1 (first apply batch — no prior progress existed to merge)
+**Batches**: 1 = PR0 Appwrite provisioning (below, complete) · 2 = PR1 scaffold-auth (appended, complete)
 
 ## Task Status (cumulative)
 
@@ -108,6 +108,7 @@ Zero 401/403 responses across every write: databases 201, collections 201/200, a
 7. **PowerShell 5.1 + curl.exe**: inline JSON args get quote-mangled → write bodies to temp files and use `-d @file` (scripts used: temp `aw.ps1`/`awb.ps1`/`probe.ps1`, not committed, secrets stay out of repo).
 8. **Membership accepted immediately** when created server-side with `userId`+`email`+`url` (`confirm: true`) — no invite-secret dance needed.
 9. `write(permission)` is stored normalized as `update`+`delete` — data layer should request whatever Appwrite accepts and not assert raw equality on `write(...)`.
+10. **Easypanel `set_env_var` read-modify-write is NOT parallel-safe** — parallel calls clobbered each other (3 of 6 vars lost on first attempt); set env vars SERIALLY and verify with `get_env_vars` after.
 
 ## Deviations from Design
 
@@ -123,3 +124,55 @@ Only the new database `agenda` was created/modified → `DELETE /databases/agend
 - **PR0 COMPLETE** (tasks 1.1–1.6 all `[x]`).
 - Phase 2 / PR1 `scaffold-auth`: toolchain bootstrap (task 2.2 = first Vitest test, TDD starts there), env module, node-appwrite clients + session cookie, middleware, `/login`.
 - After PR1 lands with package.json: enable GitHub auto-deploy on `grupo-ecotech-agenda` and first real deploy to `varios-grupo-ecotech-agenda.fjueze.easypanel.host`.
+
+---
+
+# Batch 2 — Phase 2 / PR1 `scaffold-auth` (COMPLETE)
+
+**Date**: 2026-10-04 · **Tasks**: 2.1–2.5 all `[x]` · **Pushed**: `main @ 0a91333` (origin `kike9083/grupo-ecotech-agenda`), tree clean
+**Mode**: strict TDD from task 2.2 onward (RED observed failing → GREEN each task) · 2.1 was bootstrap (pre-runner)
+**Review note**: PR1 totals ~3.9k insertions — over the 400-line budget via bootstrap bulk (Next scaffold + env module); recorded per-commit counts below per chained-pr budget rule, no stop-to-ask.
+
+## Task Status (batch 2)
+
+- [x] 2.1 create-next-app@15 scaffold (generated in temp, copied in), `npm install`, build green. AC met.
+- [x] 2.2 env module TDD: RED (`Cannot find module './env'`) → GREEN 5/5; missing prod var throws.
+- [x] 2.3 clients/session TDD: RED (2 suites failed) → GREEN; `tsc --noEmit` OK.
+- [x] 2.4 middleware TDD: RED → GREEN 6/6 (suite grew to 9/9 with expired-flow cases); build green (Middleware 39.2→39.3 kB).
+- [x] 2.5 actions TDD: RED (7 failed | 13 passed) → GREEN; login/logout pages glued; AC "cookie set/error/cleared" covered by action units.
+
+## Commits (all pushed)
+
+| commit | subject | +/− |
+|---|---|---|
+| `7e7ba77` | feat(scaffold): bootstrap Next.js 15 App Router with TypeScript and Tailwind | +2048 / −5 |
+| `1273016` | feat(env): add fail-fast server env contract with Vitest setup | +1169 / −21 |
+| `c7ef70c` | fix(env): accept injected env sources in loadEnv signature | +3 / −1 |
+| `762f135` | feat(auth): add Appwrite server clients and session helpers | +395 / −1 |
+| `0c1e47e` | feat(auth): gate protected routes with edge cookie-presence middleware | +84 / −1 |
+| `2ea9afb` | fix(deps): pin node-appwrite 19.1.0 with bundled-fetch workaround | +15 / −35 |
+| `0a91333` | feat(auth): add login/logout server actions and login page | +364 / −102 |
+
+## Verification evidence
+
+- `npx tsc --noEmit` OK · `npx vitest run` = **4 files, 37/37 passed** · `npm run build` green (`/` + `/login` dynamic ƒ, Middleware 39.3 kB).
+- Runtime smoke (`next start`): anon `/` → **307 `/login`** · stale cookie `/` → **307 `/login?error=expired`** · `/login?error=expired` + cookie → **200 + `set-cookie: aw_session=; Expires=1970`** (cleared, no loop) · `/login` anon → **200** with form. No SDK version warning in server log (format 1.8.0 ↔ server 1.8.1).
+
+## Discoveries (batch 2 — read before PR2+)
+
+1. **RSC cannot mutate cookies**: `cookies().delete()` in `getCurrentUser` throws at render ("Cookies can only be modified in a Server Action or Route Handler"). Resolution (Solution B): Home redirects null-user → `/login?error=expired`; middleware clears `aw_session` when `isLoginRoute && error=expired && hasSession` (presence-only, before the existing /login+cookie→/ bounce); `getCurrentUser`'s `onSessionInvalid` wraps clear in try/catch as fallback. Unit tests assert `aw_session=;` + `Expires=Thu, 01 Jan 1970` (Next deletes via epoch Expires, NOT `Max-Age=0`).
+2. **node-appwrite ↔ server 1.8.1 matrix**: response-format 1.8.0 only at ≤ v19; v20–25 fork transport (`node-fetch-native-with-agent@1.7.2`); v26+ switch to `undici` (format 1.9.5+ → server emits `x-appwrite-warning` "Please downgrade your SDK" on every response). **Fork transport is broken on Node 26**: its bundled-agent dispatcher against global fetch fails with `fetch failed / invalid onError method` (minimal repro: `fetch(url, {dispatcher: createAgent(...).dispatcher})`). Fix shipped: pin `node-appwrite@19.1.0` (exact 1.8.0 match) + `FORCE_NODE_FETCH=1` so the SDK uses its own bundled fetch end-to-end — proven by live probe. **⚠ The same env var MUST be added to the Easypanel service before first deploy or every login/API call fails in prod.**
+3. **Live login probe (PR0 caveat)**: transport now works — server reachable, wrong creds return proper 401. But `admin@grupoecotech.com` (exists, `status` active, `verified=true`, `passwordUpdate 2026-06-09`) does NOT match `AGENDA_ADMIN_PASSWORD` in `.env.local` (32-char value generated "during provisioning", never applied to the user). **Still open, deferred by PR0 instruction**: orchestrator/user must set a known password (`PATCH /users/6a1030c90014c56a9568/password` via API key or console) before end-to-end login can be demonstrated. Out of executor scope — do not mutate credentials unattended.
+4. `loadEnv(source: Readonly<Record<string, string | undefined>> = process.env)` — `NodeJS.ProcessEnv` now requires `NODE_ENV` (Next type augmentation).
+5. `vitest.config.mts` (a `.ts` config produced a CJS/ESM warning) · `@types/node@^24` for vitest@5 peer · npm audit: 2 vulns (1 moderate, 1 high), noted not blocking.
+6. Error UX via redirect query (`?error=credentials|missing|expired`) keeps `/login` a pure RSC — no client state machinery needed.
+
+## Deviations from Design
+
+- Middleware gained the expired-cookie clear branch (D2's presence gate stays presence-only: no JWT, no Appwrite call in edge) — forced by the RSC cookie restriction (discovery 1).
+- `node-appwrite@19.1.0` + `FORCE_NODE_FETCH` instead of "latest SDK": exact server-format match beats version recency here (discovery 2); server log stays warning-free.
+
+## Next
+
+- **PR1 COMPLETE.** Before/at first deploy: (a) add `FORCE_NODE_FETCH=1` to the Easypanel service env, (b) enable GitHub auto-deploy on `grupo-ecotech-agenda`, (c) reset admin password (open PR0 caveat), then verify login end-to-end at `varios-grupo-ecotech-agenda.fjueze.easypanel.host`.
+- Phase 3 / PR2 `schema-data-layer` (tasks 3.1–3.4, strict TDD) — start with RED `src/lib/validation/task.test.ts`.
