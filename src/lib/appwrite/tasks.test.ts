@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isDomainError } from './errors';
 import {
   createTasksApi,
+  loadAdminTasks,
   loadHomeTasks,
   type DatabasesLike,
   type RawDocument,
@@ -590,5 +591,66 @@ describe('loadHomeTasks (glue for the `/` route, task 3.4)', () => {
       'user-a',
       'user-b',
     ]);
+  });
+});
+
+describe('loadAdminTasks (glue for the `/admin` route, task 5.1)', () => {
+  it('reads every record through the session secret with no owner filter', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = {
+      total: 2,
+      documents: [
+        storedDocument('a', { createdBy: 'user-a' }),
+        storedDocument('b', { createdBy: 'user-b' }),
+      ],
+    };
+    const seenSecrets: string[] = [];
+
+    const page = await loadAdminTasks('cookie-secret', {
+      config,
+      databasesFor: (secret) => {
+        seenSecrets.push(secret);
+        return fake;
+      },
+    });
+
+    expect(seenSecrets).toEqual(['cookie-secret']);
+    expect(hasQuery(parsedQueries(fake.listCalls[0]), 'equal', 'createdBy')).toBe(
+      false,
+    );
+    expect(page.tasks.map((task) => task.createdBy)).toEqual([
+      'user-a',
+      'user-b',
+    ]);
+  });
+
+  it('carries the cursor for the next page and starts clean without one', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 1, documents: [storedDocument('later')] };
+
+    await loadAdminTasks(
+      'cookie-secret',
+      { config, databasesFor: () => fake },
+      { cursor: 'doc-20' },
+    );
+
+    expect(parsedQueries(fake.listCalls[0])).toEqual(
+      expect.arrayContaining([
+        { method: 'cursorAfter', values: ['doc-20'] },
+        { method: 'limit', values: [20] },
+      ]),
+    );
+
+    const fresh = new FakeDatabases();
+    fresh.nextList = { total: 1, documents: [storedDocument('first')] };
+
+    await loadAdminTasks('cookie-secret', {
+      config,
+      databasesFor: () => fresh,
+    });
+
+    expect(hasQuery(parsedQueries(fresh.listCalls[0]), 'cursorAfter')).toBe(
+      false,
+    );
   });
 });

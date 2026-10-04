@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeSearchTerm, parseHomeQuery } from './search-query';
+import { buildAdminHref, normalizeSearchTerm, parseHomeQuery } from './search-query';
 
 describe('normalizeSearchTerm', () => {
   it('trims surrounding whitespace and collapses inner runs', () => {
@@ -58,5 +58,16 @@ describe('parseHomeQuery', () => {
     expect(parseHomeQuery({ created: '1' }).created).toBe(true);
     expect(parseHomeQuery({ created: '0' }).created).toBe(false);
     expect(parseHomeQuery({ created: 'yes' }).created).toBe(false);
+  });
+});
+
+describe('buildAdminHref', () => {
+  it('builds the admin next-page link from the cursor', () => {
+    expect(buildAdminHref({ cursor: 'doc-20' })).toBe('/admin?cursor=doc-20');
+  });
+
+  it('falls back to the bare admin route when there is nothing to carry', () => {
+    expect(buildAdminHref({})).toBe('/admin');
+    expect(buildAdminHref({ cursor: '' })).toBe('/admin');
   });
 });

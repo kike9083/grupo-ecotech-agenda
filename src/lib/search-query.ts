@@ -49,3 +49,18 @@ export function parseHomeQuery(params: RawSearchParams | undefined): HomeQuery {
     created: firstValue(params?.created) === '1',
   };
 }
+
+/**
+ * Builds an `/admin` URL from the current list state (PR4 task 5.1): the
+ * cursor carries the next page of the all-records view. Empty pieces are
+ * omitted; nothing to carry collapses to the bare route.
+ */
+export function buildAdminHref(params: { cursor?: string }): string {
+  const query = new URLSearchParams();
+  if (params.cursor !== undefined && params.cursor !== '') {
+    query.set('cursor', params.cursor);
+  }
+
+  const serialized = query.toString();
+  return serialized === '' ? '/admin' : `/admin?${serialized}`;
+}

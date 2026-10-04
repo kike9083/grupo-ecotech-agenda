@@ -296,3 +296,33 @@ export async function loadHomeTasks(
   }
   return api.listTasks(scope);
 }
+
+/** Normalized `/admin?cursor=` state the admin route passes down (task 5.1). */
+export interface AdminListParams {
+  /** Cursor of the page being displayed — continuation of the current page. */
+  cursor?: string;
+}
+
+/**
+ * Server-side results for the `/admin` route: always the full all-records
+ * scope — visibility comes from the `team:admins` read permission, so NO
+ * owner filter is ever added (spec `record-visibility` → "Admin read").
+ * Runs through a client built from the caller's session secret, exactly like
+ * the home route; the API-key client stays reserved for admin WRITES
+ * (design D2).
+ */
+export async function loadAdminTasks(
+  sessionSecret: string,
+  deps: HomeTasksDeps,
+  params: AdminListParams = {},
+): Promise<TaskPage> {
+  const api = createTasksApi(deps.databasesFor(sessionSecret), deps.config);
+  const scope: TaskScope = { admin: true };
+
+  const cursor = params.cursor ?? '';
+  if (cursor !== '') {
+    scope.cursorAfter = cursor;
+  }
+
+  return api.listTasks(scope);
+}
