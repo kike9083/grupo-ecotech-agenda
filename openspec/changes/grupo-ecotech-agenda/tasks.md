@@ -35,10 +35,12 @@ PR1–PR4 exceed 400 lines; stack on `main`, each green.
 
 ## Phase 3: PR2 — schema-data-layer (strict TDD)
 
-- [ ] 3.1 RED `src/lib/validation/task.test.ts`: field rules + status matrix. AC: fails first.
-- [ ] 3.2 GREEN `src/lib/validation/task.ts`. AC: validation + matrix green.
-- [ ] 3.3 RED `src/lib/appwrite/tasks.test.ts`: create payload ($permissions, `searchText`, `open`), own/admin list, cursor, override. AC: fails first.
-- [ ] 3.4 GREEN `src/lib/appwrite/tasks.ts` (injected fake). AC: `npx vitest run` green; peer-isolation + admin-read pass.
+- [x] 3.1 RED `src/lib/validation/task.test.ts`: field rules + status matrix. AC: fails first.
+- [x] 3.2 GREEN `src/lib/validation/task.ts`. AC: validation + matrix green.
+- [x] 3.3 RED `src/lib/appwrite/tasks.test.ts`: create payload ($permissions, `searchText`, `open`), own/admin list, cursor, override. AC: fails first.
+- [x] 3.4 GREEN `src/lib/appwrite/tasks.ts` (injected fake). AC: `npx vitest run` green; peer-isolation + admin-read pass.
+- [x] 3.5 Map Appwrite errors to typed domain errors (`src/lib/appwrite/errors.ts`: unauthorized/session-expired, validation, not-found, unknown; wired through the data layer). Test: RED `errors.test.ts` + wiring assertions. AC: actions can branch on `kind`.
+- [x] 3.6 Integration glue: `loadHomeTasks` + `/` renders the server-side list for the logged-in user (admin scope aware). Test: RED glue units; AC: page covered by `tsc`/`vitest`/`build` green.
 
 ## Phase 4: PR3 — list-search-create (TDD)
 

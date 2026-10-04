@@ -1,10 +1,10 @@
 # Apply Progress: grupo-ecotech-agenda
 
-**Phase**: Phase 2 / PR1 — scaffold-auth (current)
-**Mode**: Standard (batch 1: strict_tdd false — no runner yet; batch 2: strict TDD from task 2.2 onward)
+**Phase**: Phase 3 / PR2 — schema-data-layer (current, COMPLETE)
+**Mode**: Standard (batch 1) → strict TDD (batch 2 from task 2.2, batch 3 fully)
 **Artifact store**: hybrid (OpenSpec file + Engram topic `sdd/grupo-ecotech-agenda/apply-progress`)
 **Date**: 2026-10-04
-**Batches**: 1 = PR0 Appwrite provisioning (below, complete) · 2 = PR1 scaffold-auth (appended, complete)
+**Batches**: 1 = PR0 Appwrite provisioning (below, complete) · 2 = PR1 scaffold-auth (middle, complete) · 3 = PR2 schema-data-layer (bottom, complete)
 
 ## Task Status (cumulative)
 
@@ -184,3 +184,74 @@ Only the new database `agenda` was created/modified → `DELETE /databases/agend
 
 - **PR1 COMPLETE.** Before/at first deploy: (a) add `FORCE_NODE_FETCH=1` to the Easypanel service env, (b) enable GitHub auto-deploy on `grupo-ecotech-agenda`, (c) reset admin password (open PR0 caveat), then verify login end-to-end at `varios-grupo-ecotech-agenda.fjueze.easypanel.host`.
 - Phase 3 / PR2 `schema-data-layer` (tasks 3.1–3.4, strict TDD) — start with RED `src/lib/validation/task.test.ts`.
+
+---
+
+# Batch 3 — Phase 3 / PR2 `schema-data-layer` (COMPLETE)
+
+**Date**: 2026-10-04 · **Tasks**: Phase 3 all `[x]` (tasks.md 3.1–3.4 + added 3.5/3.6) · **Pushed**: `main` (see commits below), tree clean at docs commit
+**Mode**: STRICT TDD — every task RED (observed failing output) → GREEN → triangulate
+**Scope**: validation module + data-access layer against a FAKE injected client (design D5); no live Appwrite calls from tests; no React forms/UI (PR3).
+
+## Task Status (batch 3 — orchestrator task ↔ tasks.md row)
+
+- [x] 3.1 `src/lib/validation/task.ts` — task input validation: type in {task,request}; title 1..200 (trimmed); description cap 2000, MAY be empty (D1 + spec form rules — see Deviations); date `YYYY-MM-DD` with real-calendar check (2026-02-30 and 2025-02-29 rejected, 2024-02-29 ok, past dates ok); time `HH:mm` 00:00–23:59; derives `searchText` = `(title + " " + description)` prefix cut to 700 (D1 formula); server defaults via `buildTaskRecord`: status `open`, createdBy/createdByEmail from session. Plus `canTransition` status matrix (tasks.md 3.1–3.2). RED `src/lib/validation/task.test.ts`.
+- [x] 3.2 `src/lib/appwrite/tasks.ts` — data access with INJECTED client: `createTask` (all 9 attrs inside `data`, `$permissions`-shaped `permissions` array `[read("user:<uid>"), write("user:<uid>"), read("team:<admins>")`], `ID.unique()` default), `listTasks` (cursor, page size 20, `date_time` + `$id` desc, `createdBy` filter for non-admin scope), `searchTasks` (JSON-string `search` query on `searchText`; empty q → unfiltered list), `updateStatus` (admin/owner path, matrix-gated, partial `{status}` write), visibility scoping per record-visibility (owner query double-enforced; admin no filter). RED `src/lib/appwrite/tasks.test.ts` with a recording fake asserting query shapes, `data` payload, permission arrays, cursor flow. (tasks.md 3.3–3.4)
+- [x] 3.3 `src/lib/appwrite/errors.ts` — typed domain errors: kinds `unauthorized | session-expired | validation | not-found | unknown`; structural mapping (401+`*session*` type → session-expired, 401/403 → unauthorized, 400/422 → validation, 404 → not-found, else unknown); `DomainError` carries `kind` + `cause`; wired through ALL data-layer calls (passthrough, no double-wrap). RED `errors.test.ts` + RED wiring assertions (5 failed | 13 passed before wire).
+- [x] 3.4 Integration glue — `loadHomeTasks` (session secret → injected `databasesFor` → `listTasks` with owner/admin scope) unit-tested; `getCurrentUser` already returns `{id, email}` (no extension needed); `/` placeholder now renders the server-side list for the logged-in user (admin scope aware, session-expired → `/login?error=expired`, other errors → inline error state). RED: `TypeError: loadHomeTasks is not a function` (2 failed).
+
+## TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 3.1 | `src/lib/validation/task.test.ts` | Unit (pure) | N/A (new); baseline 37/37 captured pre-batch | ✅ Written; observed `1 failed (1) / no tests` — `Cannot find module './task'` | ✅ 16 passed → 25 after triangulation | ✅ 200/201 title, 2000/2001 description, leap-year Feb 29, 00:00/23:59/12:60/9:00, 700-char cut, terminal matrix, multi-error collection | ➖ Already pure + constant-extracted |
+| 3.2 | `src/lib/appwrite/tasks.test.ts` | Unit (fake injected client, D5) | ✅ 25/25 | ✅ Written; observed `1 failed (1) / no tests` — `Cannot find module './tasks'` | ✅ 10 passed → 14 after triangulation | ✅ admin search cross-user, empty-q delegation, cursor across empty page, terminal statuses, distinct default doc ids | ➖ Query builders already extracted (`listQueries`/`toTask`/`toPage`) |
+| 3.3 | `src/lib/appwrite/errors.test.ts` + wiring in `tasks.test.ts` | Unit | ✅ 76/76 (full suite) | ✅ errors suite failed (`Cannot find module './errors'`) AND wiring RED `5 failed \| 13 passed` (assertions on `kind` before wiring) | ✅ errors 9/9; then wire → full suite 89/89 | ✅ 8 mapping cases (401 session/generic, 403, 400, 404, no-code, passthrough, non-Error) + 4 data-layer wiring cases | ✅ `readMessage` fix during GREEN (structural failures returned `[object Object]`) — implementation corrected, tests unchanged |
+| 3.4 | `src/lib/appwrite/tasks.test.ts` (`loadHomeTasks`) + build smoke for the page | Unit + build | ✅ 89/89 | ✅ Written; observed `TypeError: loadHomeTasks is not a function` — `2 failed \| 18 passed` | ✅ 20/20 → full suite 91/91; `npm run build` green | ✅ owner scope (secret + `createdBy` query asserted) and admin scope (filter dropped) | ➖ None needed |
+
+## Test Summary
+
+- **New tests written**: 54 (validation 25, data layer 20, errors 9)
+- **Suite growth**: 37/37 (4 files, PR1) → **91/91 (7 files)**
+- **Layers**: Unit 54 (E2E/integration deferred to sdd-verify live probe — no network in tests per D5)
+- **Pure functions created**: `validateTaskDraft`, `buildSearchText`, `buildTaskRecord`, `canTransition`, `toDomainError`, `isDomainError`, `listQueries`, `toTask`, `toPage`, `loadHomeTasks`
+
+## Commits (all pushed to `main`)
+
+| commit | subject | +/− | changed lines |
+|---|---|---|---|
+| `e8ed78c` | feat(validation): validate task drafts with real-calendar dates and status matrix | +457 / −0 | 457 |
+| `9f448d9` | feat(appwrite): add tasks data access with injected client | +616 / −0 | 616 |
+| `26d733d` | feat(appwrite): map Appwrite failures to typed domain errors | +347 / −42 | 389 |
+| `4f78a4e` | feat(app): render server-side task list on home via data layer | +145 / −6 | 151 |
+| (docs) | docs(openspec): record PR2 apply progress batch 3 | — | (this file + tasks.md) |
+| **code total** | | **+1565 / −48** | **1613** |
+
+**Budget note**: 400-line budget exceeded (forecast said 500–800; actual 1613 — test volume dominates: ~700 test lines). Recorded per-commit per chained-pr rule under `delivery_strategy: auto-forecast`; no stop-to-ask, as instructed. Mitigation applied: one work-unit commit per task, each independently green.
+
+## Verification evidence (all green before push)
+
+- `npx tsc --noEmit` — clean (after every task).
+- `npx vitest run` — **7 files, 91/91 passed**.
+- `npm run build` — green: `/` ƒ (dynamic, server list), `/login` ƒ, Middleware 39.3 kB.
+- Composition-root seam verified by tsc probe: `node-appwrite@19` `Databases` structurally satisfies the hand-written `DatabasesLike` — no casts/adapters needed.
+
+## Deviations from Design / Prompt
+
+1. **`description` MAY be empty** (prompt said "1..2000"): design D1 ("may be `""`; form never blocks on it") and spec task-registration (only title/date/time/type block submit) win — acceptance specs are authoritative; only the 2000-char cap is enforced. ⚠ Live acceptance of `""` for this required attribute was NOT probed in PR0 → sdd-verify should create one empty-description record.
+2. **`src/lib/appwrite/errors.ts` is a new file** not named in D3's File Changes table — task 3.3 requires typed errors; kept in the appwrite folder next to its consumers.
+3. **`loadHomeTasks` extraction** — the page RSC itself is not unit-tested (node env, no jsdom); its wiring lives in this pure-ish function which IS tested; page covered by tsc/build + future runtime smoke (allowed by the task statement).
+4. **tasks.md rows 3.5/3.6 added** to persist the orchestrator's error-mapping and glue tasks (original 3.1–3.4 rows kept as the RED/GREEN sub-steps they were).
+5. `/` uses `isAdmin` for scope — prompt said "for the logged-in user", spec task-listing says "admins: all"; implemented the spec (admin sees all on the list, owner filter otherwise).
+
+## Discoveries (batch 3 — read before PR3)
+
+1. **Structural failure mapping**: initial `readMessage` only read `error.message` from `Error` instances; structural fakes (`{code, type, message}`) yielded `[object Object]`. Fixed to read a string `message` property from plain objects too — fakes and AppwriteException-like shapes both map cleanly.
+2. **Query JSON shape gotcha (extends batch-0 gotcha 4)**: `JSON.stringify` drops `undefined` → `Query.limit(20)` serializes to `{"method":"limit","values":[20]}` and `Query.cursorAfter('x')` to `{"method":"cursorAfter","values":["x"]}` (NO `attribute` key). Assertions must match that exact shape.
+3. **vitest RED comes in two flavors**: missing module → suite-level `Failed to load test file` (no tests collected); missing export on an existing module → per-test `TypeError: x is not a function`. Both observed and recorded as valid RED.
+4. **Domain-error passthrough**: data-layer `catch → toDomainError` is idempotent (already-mapped errors return as-is), so nested wrappers (search → list, page → list) never double-wrap.
+
+## Next
+
+- **PR2 COMPLETE.** Next: Phase 4 / PR3 `list-search-create` (tasks 4.1–4.3, TDD): `/` list UI + search box + cursor next-link + `/nueva` form/action with inline errors — the action layer branches on `DomainError.kind` (task 3.3 output).
+- sdd-verify (after PR3/PR4): live probe both roles + fulltext; still gated on a real admin password (PR0/PR1 caveat); add empty-`description` create probe (deviation 1).
