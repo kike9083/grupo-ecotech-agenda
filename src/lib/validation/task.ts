@@ -47,12 +47,12 @@ export type TaskValidationResult =
 
 /** Message shown inline next to the offending field (spec `task-registration`). */
 const ERROR_MESSAGES = {
-  type: 'Type must be "task" or "request".',
-  titleRequired: 'Title is required.',
-  titleTooLong: `Title must be at most ${TITLE_MAX_LENGTH} characters.`,
-  descriptionTooLong: `Description must be at most ${DESCRIPTION_MAX_LENGTH} characters.`,
-  date: 'Date must be a valid date in YYYY-MM-DD format.',
-  time: 'Time must be a valid 24-hour time in HH:mm format.',
+  type: 'El tipo debe ser "task" o "request".',
+  titleRequired: 'El título es obligatorio.',
+  titleTooLong: `El título debe tener como máximo ${TITLE_MAX_LENGTH} caracteres.`,
+  descriptionTooLong: `La descripción debe tener como máximo ${DESCRIPTION_MAX_LENGTH} caracteres.`,
+  date: 'La fecha debe ser una fecha válida en formato AAAA-MM-DD.',
+  time: 'La hora debe ser una hora válida en formato 24 horas (HH:MM).',
 } as const;
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;

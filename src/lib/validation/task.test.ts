@@ -37,7 +37,7 @@ describe('validateTaskDraft', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.type).toBe('Type must be "task" or "request".');
+      expect(result.errors.type).toBe('El tipo debe ser "task" o "request".');
     }
   });
 
@@ -55,7 +55,7 @@ describe('validateTaskDraft', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.title).toBe('Title is required.');
+      expect(result.errors.title).toBe('El título es obligatorio.');
     }
   });
 
@@ -65,7 +65,7 @@ describe('validateTaskDraft', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errors.date).toBe(
-        'Date must be a valid date in YYYY-MM-DD format.',
+        'La fecha debe ser una fecha válida en formato AAAA-MM-DD.',
       );
     }
   });
@@ -76,7 +76,7 @@ describe('validateTaskDraft', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errors.date).toBe(
-        'Date must be a valid date in YYYY-MM-DD format.',
+        'La fecha debe ser una fecha válida en formato AAAA-MM-DD.',
       );
     }
   });
@@ -96,7 +96,7 @@ describe('validateTaskDraft', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errors.time).toBe(
-        'Time must be a valid 24-hour time in HH:mm format.',
+        'La hora debe ser una hora válida en formato 24 horas (HH:MM).',
       );
     }
   });
@@ -132,7 +132,7 @@ describe('validateTaskDraft', () => {
     expect(tooLong.ok).toBe(false);
     if (!tooLong.ok) {
       expect(tooLong.errors.title).toBe(
-        'Title must be at most 200 characters.',
+        'El título debe tener como máximo 200 caracteres.',
       );
     }
   });
@@ -149,7 +149,7 @@ describe('validateTaskDraft', () => {
     expect(tooLong.ok).toBe(false);
     if (!tooLong.ok) {
       expect(tooLong.errors.description).toBe(
-        'Description must be at most 2000 characters.',
+        'La descripción debe tener como máximo 2000 caracteres.',
       );
     }
 

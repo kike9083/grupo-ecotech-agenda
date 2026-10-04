@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Databases } from 'node-appwrite';
 import { logout } from '@/actions/auth';
@@ -15,10 +16,11 @@ import { loadHomeTasks, type TaskPage } from '@/lib/appwrite/tasks';
 import { parseHomeQuery, type RawSearchParams } from '@/lib/search-query';
 
 /**
- * Home (PR3 tasks 4.1–4.2): the task list UI for the signed-in caller —
+ * Home (PR3 tasks 4.1–4.3): the task list UI for the signed-in caller —
  * sorted cursor pages from the data layer, keyword search through `?q=`
  * (spec `task-search`), status/type badges, creator attribution, empty and
- * error states (spec `task-listing`). The create entry point lands with 4.3.
+ * error states (spec `task-listing`), the create entry point, and the
+ * success banner after a record is stored (spec `task-registration`).
  */
 export default async function HomePage({
   searchParams,
@@ -37,7 +39,7 @@ export default async function HomePage({
     redirect('/login?error=expired');
   }
 
-  const { q, cursor } = parseHomeQuery(await searchParams);
+  const { q, cursor, created } = parseHomeQuery(await searchParams);
   const env = loadEnv();
   const admin = await isAdmin();
 
@@ -70,20 +72,37 @@ export default async function HomePage({
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-12">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Agenda</h1>
-        <form action={logout}>
-          <button
-            type="submit"
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+        <div className="flex items-center gap-2">
+          <Link
+            href="/nueva"
+            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white"
           >
-            Cerrar sesión
-          </button>
-        </form>
+            Nueva tarea
+          </Link>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+            >
+              Cerrar sesión
+            </button>
+          </form>
+        </div>
       </header>
 
       <p className="text-sm text-neutral-600">
         Sesión iniciada como <span className="font-medium">{user.email}</span>
         {admin ? ' (administrador)' : ''}
       </p>
+
+      {created ? (
+        <p
+          role="status"
+          className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
+        >
+          Tarea creada correctamente.
+        </p>
+      ) : null}
 
       <SearchForm q={q} />
       <TaskList page={page} q={q} cursor={cursor} />
