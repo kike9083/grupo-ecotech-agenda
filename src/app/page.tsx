@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { Databases } from 'node-appwrite';
 import { logout } from '@/actions/auth';
+import { LoadingState } from '@/components/loading-state';
 import { SearchForm } from '@/components/search-form';
 import { TaskList } from '@/components/task-list';
 import { loadEnv } from '@/lib/env';
@@ -14,6 +16,58 @@ import {
 } from '@/lib/appwrite/session';
 import { loadHomeTasks, type TaskPage } from '@/lib/appwrite/tasks';
 import { parseHomeQuery, type RawSearchParams } from '@/lib/search-query';
+
+/**
+ * The data region of the home route, wrapped in its own <Suspense> (verify
+ * fix F2): the loading boundary belongs HERE, co-located with the call that
+ * actually streams, not in a root `loading.tsx` — a route-level boundary at
+ * the root flushes status 200 for every child route before the /admin gate
+ * can throw `notFound()`. Inside this boundary the behavior is unchanged:
+ * data loads through the session client, session expiry redirects, other
+ * failures fall through to the inline error state.
+ */
+async function HomeTasksSection({
+  user,
+  secret,
+  admin,
+  q,
+  cursor,
+}: {
+  user: { id: string; email: string };
+  secret: string;
+  admin: boolean;
+  q: string;
+  cursor: string;
+}) {
+  const env = loadEnv();
+
+  let page: TaskPage | null = null;
+  try {
+    page = await loadHomeTasks(
+      user,
+      secret,
+      admin,
+      {
+        config: {
+          databaseId: env.APPWRITE_DATABASE_ID,
+          collectionId: env.APPWRITE_TASKS_COLLECTION_ID,
+          adminsTeamId: env.APPWRITE_ADMINS_TEAM_ID,
+        },
+        databasesFor: (sessionSecret) =>
+          new Databases(createSessionClient(sessionSecret)),
+      },
+      { q, cursor },
+    );
+  } catch (error) {
+    if (isDomainError(error) && error.kind === 'session-expired') {
+      // Cookie went stale mid-request: same recovery path as a null user.
+      redirect('/login?error=expired');
+    }
+    // Other failures fall through to the inline error state (spec task-listing).
+  }
+
+  return <TaskList page={page} q={q} cursor={cursor} />;
+}
 
 /**
  * Home (PR3 tasks 4.1–4.3): the task list UI for the signed-in caller —
@@ -40,33 +94,7 @@ export default async function HomePage({
   }
 
   const { q, cursor, created } = parseHomeQuery(await searchParams);
-  const env = loadEnv();
   const admin = await isAdmin();
-
-  let page: TaskPage | null = null;
-  try {
-    page = await loadHomeTasks(
-      user,
-      secret,
-      admin,
-      {
-        config: {
-          databaseId: env.APPWRITE_DATABASE_ID,
-          collectionId: env.APPWRITE_TASKS_COLLECTION_ID,
-          adminsTeamId: env.APPWRITE_ADMINS_TEAM_ID,
-        },
-        databasesFor: (sessionSecret) =>
-          new Databases(createSessionClient(sessionSecret)),
-      },
-      { q, cursor },
-    );
-  } catch (error) {
-    if (isDomainError(error) && error.kind === 'session-expired') {
-      // Cookie went stale mid-request: same recovery path as a null user.
-      redirect('/login?error=expired');
-    }
-    // Other failures fall through to the inline error state (spec task-listing).
-  }
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-12">
@@ -113,7 +141,15 @@ export default async function HomePage({
       ) : null}
 
       <SearchForm q={q} />
-      <TaskList page={page} q={q} cursor={cursor} />
+      <Suspense fallback={<LoadingState />}>
+        <HomeTasksSection
+          user={user}
+          secret={secret}
+          admin={admin}
+          q={q}
+          cursor={cursor}
+        />
+      </Suspense>
     </main>
   );
 }
