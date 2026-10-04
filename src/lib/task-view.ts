@@ -71,12 +71,16 @@ export function emptyMessage(options: { searching: boolean }): string {
 }
 
 /**
- * Builds the `/` URL for the current list state: the cursor carries the next
- * page (design D3 next-link). Empty pieces are omitted; nothing to carry
- * collapses to the bare route (task 4.2 adds the `q` keyword branch).
+ * Builds an `/` URL from the current query state: the cursor carries the
+ * next page (design D3 next-link) and `q` keeps a keyword search alive
+ * across pages (spec `task-search`). Empty pieces are omitted; nothing to
+ * carry collapses to the bare route.
  */
-export function buildListHref(params: { cursor?: string }): string {
+export function buildListHref(params: { cursor?: string; q?: string }): string {
   const query = new URLSearchParams();
+  if (params.q !== undefined && params.q !== '') {
+    query.set('q', params.q);
+  }
   if (params.cursor !== undefined && params.cursor !== '') {
     query.set('cursor', params.cursor);
   }

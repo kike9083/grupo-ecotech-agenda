@@ -525,4 +525,70 @@ describe('loadHomeTasks (glue for the `/` route, task 3.4)', () => {
     );
     expect(page.tasks).toHaveLength(2);
   });
+
+  it('runs a scoped keyword search from the home query with the cursor carried over', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 1, documents: [storedDocument('hit')] };
+
+    await loadHomeTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      false,
+      { config, databasesFor: () => fake },
+      { q: '  pago ', cursor: 'd19' },
+    );
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(queries).toEqual(
+      expect.arrayContaining([
+        { method: 'search', attribute: 'searchText', values: ['pago'] },
+        { method: 'equal', attribute: 'createdBy', values: ['user-123'] },
+        { method: 'cursorAfter', values: ['d19'] },
+      ]),
+    );
+  });
+
+  it('falls back to the plain list when the home query is blank', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 2, documents: [storedDocument('a')] };
+
+    await loadHomeTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      false,
+      { config, databasesFor: () => fake },
+      { q: '   ' },
+    );
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(hasQuery(queries, 'search')).toBe(false);
+    expect(hasQuery(queries, 'limit')).toBe(true);
+  });
+
+  it('searches across every user from the home query for admins', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = {
+      total: 2,
+      documents: [
+        storedDocument('a', { createdBy: 'user-a' }),
+        storedDocument('b', { createdBy: 'user-b' }),
+      ],
+    };
+
+    const page = await loadHomeTasks(
+      { id: 'admin-1' },
+      'cookie-secret',
+      true,
+      { config, databasesFor: () => fake },
+      { q: 'pago' },
+    );
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(hasQuery(queries, 'search', 'searchText')).toBe(true);
+    expect(hasQuery(queries, 'equal', 'createdBy')).toBe(false);
+    expect(page.tasks.map((task) => task.createdBy)).toEqual([
+      'user-a',
+      'user-b',
+    ]);
+  });
 });

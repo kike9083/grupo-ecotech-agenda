@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { Databases } from 'node-appwrite';
 import { logout } from '@/actions/auth';
+import { SearchForm } from '@/components/search-form';
 import { TaskList } from '@/components/task-list';
 import { loadEnv } from '@/lib/env';
 import { createSessionClient } from '@/lib/appwrite/clients';
@@ -11,14 +12,19 @@ import {
   isAdmin,
 } from '@/lib/appwrite/session';
 import { loadHomeTasks, type TaskPage } from '@/lib/appwrite/tasks';
+import { parseHomeQuery, type RawSearchParams } from '@/lib/search-query';
 
 /**
- * Home (PR3 task 4.1): the task list UI for the signed-in caller — sorted
- * cursor pages from the data layer, status/type badges, creator attribution,
- * empty and error states (spec `task-listing`). Search (4.2) and the create
- * entry point (4.3) land in the next commits of this batch.
+ * Home (PR3 tasks 4.1–4.2): the task list UI for the signed-in caller —
+ * sorted cursor pages from the data layer, keyword search through `?q=`
+ * (spec `task-search`), status/type badges, creator attribution, empty and
+ * error states (spec `task-listing`). The create entry point lands with 4.3.
  */
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<RawSearchParams>;
+}) {
   const user = await getCurrentUser();
   if (user === null) {
     // Middleware guarantees a cookie here, so null means it went stale.
@@ -31,20 +37,27 @@ export default async function HomePage() {
     redirect('/login?error=expired');
   }
 
+  const { q, cursor } = parseHomeQuery(await searchParams);
   const env = loadEnv();
   const admin = await isAdmin();
 
   let page: TaskPage | null = null;
   try {
-    page = await loadHomeTasks(user, secret, admin, {
-      config: {
-        databaseId: env.APPWRITE_DATABASE_ID,
-        collectionId: env.APPWRITE_TASKS_COLLECTION_ID,
-        adminsTeamId: env.APPWRITE_ADMINS_TEAM_ID,
+    page = await loadHomeTasks(
+      user,
+      secret,
+      admin,
+      {
+        config: {
+          databaseId: env.APPWRITE_DATABASE_ID,
+          collectionId: env.APPWRITE_TASKS_COLLECTION_ID,
+          adminsTeamId: env.APPWRITE_ADMINS_TEAM_ID,
+        },
+        databasesFor: (sessionSecret) =>
+          new Databases(createSessionClient(sessionSecret)),
       },
-      databasesFor: (sessionSecret) =>
-        new Databases(createSessionClient(sessionSecret)),
-    });
+      { q, cursor },
+    );
   } catch (error) {
     if (isDomainError(error) && error.kind === 'session-expired') {
       // Cookie went stale mid-request: same recovery path as a null user.
@@ -72,7 +85,8 @@ export default async function HomePage() {
         {admin ? ' (administrador)' : ''}
       </p>
 
-      <TaskList page={page} cursor="" />
+      <SearchForm q={q} />
+      <TaskList page={page} q={q} cursor={cursor} />
     </main>
   );
 }

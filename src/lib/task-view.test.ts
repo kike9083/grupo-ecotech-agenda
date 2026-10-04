@@ -80,6 +80,10 @@ describe('emptyMessage', () => {
   it('invites creating the first record when the plain list is empty', () => {
     expect(emptyMessage({ searching: false })).toBe('No hay tareas todavía.');
   });
+
+  it('shows the no-results state when a keyword search matches nothing', () => {
+    expect(emptyMessage({ searching: true })).toBe('Sin resultados.');
+  });
 });
 
 describe('list error copy', () => {
@@ -95,6 +99,12 @@ describe('list error copy', () => {
 describe('buildListHref', () => {
   it('builds the next-page link from the cursor', () => {
     expect(buildListHref({ cursor: 'doc-20' })).toBe('/?cursor=doc-20');
+  });
+
+  it('keeps the keyword in the next-page link so search paginates', () => {
+    expect(buildListHref({ cursor: 'doc-20', q: 'pago' })).toBe(
+      '/?q=pago&cursor=doc-20',
+    );
   });
 
   it('falls back to the bare route when there is nothing to carry', () => {

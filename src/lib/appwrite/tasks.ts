@@ -255,11 +255,20 @@ export interface HomeTasksDeps {
   databasesFor(secret: string): DatabasesLike;
 }
 
+/** Normalized `/?q=&cursor=` state the home route passes down (task 4.2). */
+export interface HomeListParams {
+  /** Keyword from the search box — empty or absent means the plain list. */
+  q?: string;
+  /** Cursor of the page being displayed — continuation of the current page. */
+  cursor?: string;
+}
+
 /**
- * Server-side list for the home route: resolves the caller's scope (admins
+ * Server-side results for the home route: resolves the caller's scope (admins
  * see everything, users only their own — spec `record-visibility`) and runs
- * `listTasks` through a client built from the caller's session secret, so
- * Appwrite enforces document permissions on top of the query filter.
+ * `searchTasks` when the query carries a keyword, `listTasks` otherwise — both
+ * through a client built from the caller's session secret, so Appwrite
+ * enforces document permissions on top of the query filter.
  *
  * Kept out of the page component so this wiring is unit-testable without
  * mocking `next/headers` (the page itself is covered by build + smoke).
@@ -269,10 +278,21 @@ export async function loadHomeTasks(
   sessionSecret: string,
   admin: boolean,
   deps: HomeTasksDeps,
+  params: HomeListParams = {},
 ): Promise<TaskPage> {
   const api = createTasksApi(deps.databasesFor(sessionSecret), deps.config);
   const scope: TaskScope = admin
     ? { admin: true }
     : { admin: false, ownerId: user.id };
+
+  const cursor = params.cursor ?? '';
+  if (cursor !== '') {
+    scope.cursorAfter = cursor;
+  }
+
+  const term = (params.q ?? '').trim();
+  if (term !== '') {
+    return api.searchTasks(term, scope);
+  }
   return api.listTasks(scope);
 }

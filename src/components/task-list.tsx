@@ -19,12 +19,15 @@ import {
  */
 interface TaskListProps {
   page: TaskPage | null;
+  /** Normalized keyword — empty means the plain list (spec task-search). */
+  q: string;
   /** Cursor of the page currently displayed — used to rebuild the retry URL. */
   cursor: string;
 }
 
-export function TaskList({ page, cursor }: TaskListProps) {
+export function TaskList({ page, q, cursor }: TaskListProps) {
   const state = resolveListState(page);
+  const searching = q !== '';
 
   if (state.kind === 'error') {
     return (
@@ -33,7 +36,7 @@ export function TaskList({ page, cursor }: TaskListProps) {
           {LOAD_ERROR_MESSAGE}
         </p>
         <a
-          href={buildListHref({ cursor })}
+          href={buildListHref({ cursor, q })}
           className="text-sm font-medium text-red-800 underline"
         >
           {RETRY_LABEL}
@@ -43,7 +46,7 @@ export function TaskList({ page, cursor }: TaskListProps) {
   }
 
   if (state.kind === 'empty') {
-    return <p className="text-sm text-neutral-500">{emptyMessage({ searching: false })}</p>;
+    return <p className="text-sm text-neutral-500">{emptyMessage({ searching })}</p>;
   }
 
   const { tasks, nextCursor } = state.page;
@@ -83,7 +86,7 @@ export function TaskList({ page, cursor }: TaskListProps) {
       {nextCursor !== null ? (
         <div className="flex justify-center">
           <a
-            href={buildListHref({ cursor: nextCursor })}
+            href={buildListHref({ cursor: nextCursor, q })}
             rel="next"
             className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium"
           >
