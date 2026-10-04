@@ -1,5 +1,10 @@
 import type { TaskPage } from '@/lib/appwrite/tasks';
-import type { TaskStatus, TaskType } from '@/lib/validation/task';
+import {
+  TASK_STATUSES,
+  canTransition,
+  type TaskStatus,
+  type TaskType,
+} from '@/lib/validation/task';
 
 /**
  * Presentational helpers for the task list (PR3 task 4.1, spec `task-listing`).
@@ -37,6 +42,30 @@ export function typeLabel(type: TaskType): string {
       return 'Tarea';
     case 'request':
       return 'Solicitud';
+  }
+}
+
+/**
+ * Buttons a row should offer for its current status (PR4 task 5.2, spec
+ * `task-registration` → "Status lifecycle"): derived from the same
+ * `canTransition` matrix the action enforces, so the UI can never offer an
+ * illegal move. Terminal records get no controls.
+ */
+export function allowedTransitions(from: TaskStatus): TaskStatus[] {
+  return TASK_STATUSES.filter((to) => canTransition(from, to));
+}
+
+/** Spanish label for a transition submit button. */
+export function statusActionLabel(to: TaskStatus): string {
+  switch (to) {
+    case 'open':
+      return 'Reabrir';
+    case 'in_progress':
+      return 'Iniciar';
+    case 'done':
+      return 'Completar';
+    case 'cancelled':
+      return 'Cancelar';
   }
 }
 

@@ -1,10 +1,15 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { Databases } from 'node-appwrite';
-import { createSessionClient } from '@/lib/appwrite/clients';
+import { createAdminClient, createSessionClient } from '@/lib/appwrite/clients';
 import { loadEnv } from '@/lib/env';
-import { getCurrentUser, getSessionSecret } from '@/lib/appwrite/session';
+import {
+  getCurrentUser,
+  getSessionSecret,
+  isAdmin,
+} from '@/lib/appwrite/session';
 import { createTasksApi } from '@/lib/appwrite/tasks';
 import {
   INITIAL_CREATE_STATE,
@@ -12,6 +17,13 @@ import {
   performCreateTask,
   type CreateTaskState,
 } from '@/lib/task-creation';
+import {
+  INITIAL_STATUS_UPDATE_STATE,
+  STATUS_ERROR_MESSAGES,
+  performStatusUpdate,
+  type StatusUpdateInput,
+  type StatusUpdateState,
+} from '@/lib/task-status';
 
 /** Reads the raw form payload — every field optional so gaps become field errors. */
 function readDraft(formData: FormData): {
@@ -76,4 +88,61 @@ export async function createTaskAction(
   );
 
   return state;
+}
+
+/**
+ * Status-change server action (PR4 task 5.2, design D3): thin adapter over
+ * the tested `performStatusUpdate` flow. Local gates (malformed input,
+ * illegal transition, non-owner without the admin flag) resolve before any
+ * data-layer call; on success both lists re-render, expected failures come
+ * back as Spanish copy, and an expired session redirects to login.
+ */
+export async function updateStatusAction(
+  _prevState: StatusUpdateState,
+  formData: FormData,
+): Promise<StatusUpdateState> {
+  const input: StatusUpdateInput = {
+    documentId: String(formData.get('documentId') ?? ''),
+    createdBy: String(formData.get('createdBy') ?? ''),
+    from: String(formData.get('from') ?? ''),
+    to: String(formData.get('to') ?? ''),
+  };
+
+  const user = await getCurrentUser();
+  const secret = await getSessionSecret();
+  if (user === null || secret === null) {
+    redirect(SESSION_EXPIRED_REDIRECT);
+  }
+
+  const admin = await isAdmin();
+  const env = loadEnv();
+
+  const result = await performStatusUpdate(
+    {
+      ownerId: user.id,
+      admin,
+      updateStatus: (client, documentId, from, to) =>
+        createTasksApi(
+          client === 'admin'
+            ? new Databases(createAdminClient())
+            : new Databases(createSessionClient(secret)),
+          {
+            databaseId: env.APPWRITE_DATABASE_ID,
+            collectionId: env.APPWRITE_TASKS_COLLECTION_ID,
+            adminsTeamId: env.APPWRITE_ADMINS_TEAM_ID,
+          },
+        ).updateStatus(documentId, from, to),
+    },
+    input,
+  );
+
+  if (result.ok) {
+    revalidatePath('/');
+    revalidatePath('/admin');
+    return INITIAL_STATUS_UPDATE_STATE;
+  }
+  if (result.reason === 'session-expired') {
+    redirect(SESSION_EXPIRED_REDIRECT);
+  }
+  return { message: STATUS_ERROR_MESSAGES[result.reason] };
 }

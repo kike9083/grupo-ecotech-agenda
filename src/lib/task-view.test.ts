@@ -5,10 +5,12 @@ import {
   NEXT_PAGE_LABEL,
   RETRY_LABEL,
   adminEmptyMessage,
+  allowedTransitions,
   buildListHref,
   emptyMessage,
   formatCreatedBy,
   resolveListState,
+  statusActionLabel,
   statusLabel,
   typeLabel,
 } from './task-view';
@@ -98,6 +100,29 @@ describe('adminEmptyMessage (PR4 task 5.2, admin view empty states)', () => {
     expect(adminEmptyMessage({ filtered: true })).toBe(
       'Sin resultados para los filtros aplicados.',
     );
+  });
+});
+
+describe('allowedTransitions (spec task-registration → Status lifecycle)', () => {
+  it('offers the next lifecycle step plus cancel from an open record', () => {
+    expect(allowedTransitions('open')).toEqual(['in_progress', 'cancelled']);
+  });
+
+  it('offers completion and cancel from an in-progress record', () => {
+    expect(allowedTransitions('in_progress')).toEqual(['done', 'cancelled']);
+  });
+
+  it('offers nothing on terminal records', () => {
+    expect(allowedTransitions('done')).toEqual([]);
+    expect(allowedTransitions('cancelled')).toEqual([]);
+  });
+});
+
+describe('statusActionLabel', () => {
+  it('labels every transition button in Spanish', () => {
+    expect(statusActionLabel('in_progress')).toBe('Iniciar');
+    expect(statusActionLabel('done')).toBe('Completar');
+    expect(statusActionLabel('cancelled')).toBe('Cancelar');
   });
 });
 

@@ -1,4 +1,5 @@
 import type { TaskPage } from '@/lib/appwrite/tasks';
+import { StatusControls } from '@/components/status-controls';
 import {
   LOAD_ERROR_MESSAGE,
   NEXT_PAGE_LABEL,
@@ -57,7 +58,7 @@ export function TaskList({ page, q, cursor }: TaskListProps) {
         {tasks.map((task) => (
           <li
             key={task.$id}
-            className="flex flex-col gap-2 rounded-md border border-neutral-300 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-2 rounded-md border border-neutral-300 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
           >
             <div className="flex min-w-0 flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -79,6 +80,14 @@ export function TaskList({ page, q, cursor }: TaskListProps) {
                 {statusLabel(task.status)}
               </span>
             </div>
+
+            <StatusControls
+              task={{
+                $id: task.$id,
+                status: task.status,
+                createdBy: task.createdBy,
+              }}
+            />
           </li>
         ))}
       </ul>
