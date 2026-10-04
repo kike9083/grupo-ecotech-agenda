@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { Account } from 'node-appwrite';
 import { createSessionClient } from '@/lib/appwrite/clients';
+import { createEmailPasswordSession } from '@/lib/appwrite/login-transport';
 import {
   clearSessionCookie,
   getSessionSecret,
@@ -12,8 +13,10 @@ import {
 } from '@/lib/appwrite/session';
 
 /**
- * Login server action (design D2): email + password → Appwrite
- * `createEmailPasswordSession` → httpOnly `aw_session` cookie → redirect `/`.
+ * Login server action (design D2): email + password → Appwrite session
+ * created through the API-key-authenticated transport (verify fix F1 — the
+ * keyless client used to receive `secret: ""` and stored an empty cookie)
+ * → httpOnly `aw_session` cookie → redirect `/`.
  * Failures redirect back to `/login?error=...` so the page stays an RSC.
  */
 export async function login(formData: FormData): Promise<void> {
@@ -22,10 +25,7 @@ export async function login(formData: FormData): Promise<void> {
 
   await performLogin(
     {
-      createEmailPasswordSession: async (emailArg, passwordArg) => {
-        const account = new Account(createSessionClient(null));
-        return account.createEmailPasswordSession(emailArg, passwordArg);
-      },
+      createEmailPasswordSession,
       setSessionCookie,
       onSuccess: () => redirect('/'),
       onFailure: (reason) => redirect(`/login?error=${reason}`),
