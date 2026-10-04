@@ -8,7 +8,7 @@ Per-user visibility; admins see all.
 
 ### Requirement: Own records only
 
-Each user MUST see only their own records, enforced server-side via document permissions (creator `user:<uid>` r/w + `team:admins` read) and server queries; others' records MUST NOT be readable or writable.
+Each user MUST see only their own records, enforced server-side via per-document creator grants (`read("user:<uid>")` / `write("user:<uid>")`), a collection-level admin read grant (`read("team:admins")`), and server queries; others' records MUST NOT be readable or writable.
 
 #### Scenario: Peer isolation
 

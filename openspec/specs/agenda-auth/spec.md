@@ -8,7 +8,7 @@ Server-side authentication and admin-role detection.
 
 ### Requirement: Server-side session
 
-Auth MUST use email/password with a server-managed HTTP-only cookie; the browser MUST NOT call Appwrite.
+Auth MUST use email/password with a server-managed HTTP-only cookie; the browser MUST NOT call Appwrite. The server MUST obtain the session secret through a server-side, API-key-authenticated request (Appwrite returns `secret` only to keyed requests).
 
 #### Scenario: Login
 
