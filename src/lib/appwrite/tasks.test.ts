@@ -175,10 +175,23 @@ describe('createTask', () => {
       createdByEmail: 'owner@example.com',
       searchText: 'Prepare invoice Send the October invoice',
     });
+    // F3b: no `team:` grant — Appwrite rejects roles the creator does not
+    // hold (401 for members); admins read via the collection-level grant.
     expect(call.permissions).toEqual([
       'read("user:user-123")',
       'write("user:user-123")',
-      'read("team:admins")',
+    ]);
+  });
+
+  it('scopes the document grants to a different creator without any team role', async () => {
+    const fake = new FakeDatabases();
+    const api = createTasksApi(fake, config);
+
+    await api.createTask({ ...record, createdBy: 'user-999' });
+
+    expect(fake.createCalls[0].permissions).toEqual([
+      'read("user:user-999")',
+      'write("user:user-999")',
     ]);
   });
 

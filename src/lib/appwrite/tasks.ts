@@ -56,7 +56,7 @@ export interface TasksConfig {
 /**
  * Who is asking (spec `record-visibility`): non-admins are double-enforced to
  * their own records via a `createdBy` query; admins list everything (their
- * visibility comes from the `team:admins` document permission).
+ * read comes from the collection-level `team:admins` permission).
  */
 /**
  * Optional filters of the admin view (PR4 task 5.2): status, type and
@@ -169,11 +169,16 @@ export function createTasksApi(
 ) {
   return {
     /**
-     * Persists a validated record (validation module output) with the D1
-     * permission shape: creator read+write, admins read. Appwrite 1.8 stores
-     * attributes inside `data` and takes the array as `permissions`
-     * (gotcha 3); `write(...)` is normalized server-side to update+delete
-     * (gotcha 9), so we never assert raw equality on stored permissions.
+     * Persists a validated record (validation module output) with
+     * creator-only document permissions: `read`/`write` for the owner.
+     * The `team:admins` grant lives at COLLECTION level instead — Appwrite
+     * only lets a session grant roles it holds itself, so sending
+     * `read("team:admins")` from a member session fails with 401 (verify
+     * F3b), while the collection grant gives admins read of every document.
+     * Appwrite 1.8 stores attributes inside `data` and takes the array as
+     * `permissions` (gotcha 3); `write(...)` is normalized server-side to
+     * update+delete (gotcha 9), so we never assert raw equality on stored
+     * permissions.
      */
     async createTask(
       record: TaskRecord,
@@ -183,7 +188,6 @@ export function createTasksApi(
         const permissions = [
           Permission.read(Role.user(record.createdBy)),
           Permission.write(Role.user(record.createdBy)),
-          Permission.read(Role.team(config.adminsTeamId)),
         ];
 
         const doc = await databases.createDocument(
@@ -335,9 +339,10 @@ export interface AdminListParams {
 
 /**
  * Server-side results for the `/admin` route: always the full all-records
- * scope — visibility comes from the `team:admins` read permission, so NO
- * owner filter is ever added (spec `record-visibility` → "Admin read").
- * Optional status/type/creator filters narrow the query server-side. Runs
+ * scope — visibility comes from the collection-level `team:admins` read
+ * permission, so NO owner filter is ever added (spec `record-visibility` →
+ * "Admin read"). Optional status/type/creator filters narrow the query
+ * server-side. Runs
  * through a client built from the caller's session secret, exactly like the
  * home route; the API-key client stays reserved for admin WRITES
  * (design D2).
