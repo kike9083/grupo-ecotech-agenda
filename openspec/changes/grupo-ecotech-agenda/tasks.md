@@ -18,11 +18,11 @@ PR1–PR4 exceed 400 lines; stack on `main`, each green.
 
 ## Phase 1: Infrastructure (PR0 — no tests possible: infra)
 
-- [ ] 1.1 `git init`, first conventional commit (README, `openspec/`), push `main` → kike9083/grupo-ecotech-agenda. AC: remote serves commit.
-- [ ] 1.2 Appwrite REST: DB `agenda`, collection `tasks`, 9 attributes per design D1. AC: attributes match D1.
-- [ ] 1.3 Appwrite REST: fulltext index `searchText`; key (`date`,`time`) desc,desc. AC: both active.
-- [ ] 1.4 Appwrite REST: team `admins` (owner admin@grupoecotech.com) + first user. AC: REST login works.
-- [ ] 1.5 Fulltext probe (risk #1): seed, `Query.search` hits; shrink `searchText` if rejected. AC: match logged.
+- [x] 1.1 `git init`, first conventional commit (README, `openspec/`), push `main` → kike9083/grupo-ecotech-agenda. AC: remote serves commit.
+- [x] 1.2 Appwrite REST: DB `agenda`, collection `tasks`, 9 attributes per design D1. AC: attributes match D1.
+- [x] 1.3 Appwrite REST: fulltext index `searchText`; key (`date`,`time`) desc,desc. AC: both active.
+- [x] 1.4 Appwrite REST: team `admins` (owner admin@grupoecotech.com) + first user. AC: REST login works.
+- [x] 1.5 Fulltext probe (risk #1): seed, `Query.search` hits; shrink `searchText` if rejected. AC: match logged.
 - [ ] 1.6 Easypanel `varios`: service `grupo-ecotech-agenda`, GitHub main, 6 env vars (D4), domain; deploy post-2.1. AC: healthy.
 
 ## Phase 2: PR1 — scaffold-auth (bootstrap; no tests possible pre-Vitest)
