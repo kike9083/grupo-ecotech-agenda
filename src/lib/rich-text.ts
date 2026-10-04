@@ -1,8 +1,67 @@
+import sanitizeHtml from 'sanitize-html';
+
 /**
- * Rich-text helpers (spec `note-capture`). This module will become
- * server-only once the sanitizer lands (PR3): it derives the plain text that
- * feeds `searchText` here, and will render the sanitized body.
+ * Rich-text helpers (spec `note-capture`). SERVER-ONLY: `sanitize-html` must
+ * never reach the client bundle. `plainTextFromHtml` derives the text that
+ * feeds `searchText`; `sanitizeNoteHtml` renders the stored body safely.
  */
+
+/**
+ * Whitelist for note bodies: the Tiptap starter-kit formatting set only.
+ * `sanitize-html` strips `<script>` (with its content), inline event handlers
+ * (`onerror`, …) and non-`http(s)`/`mailto` URLs by default.
+ */
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: [
+    'p',
+    'br',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'u',
+    's',
+    'strike',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'ul',
+    'ol',
+    'li',
+    'blockquote',
+    'code',
+    'pre',
+    'a',
+    'hr',
+    'span',
+  ],
+  allowedAttributes: {
+    a: ['href', 'target', 'rel'],
+    p: ['style'],
+    span: ['style'],
+    h1: ['style'],
+    h2: ['style'],
+    h3: ['style'],
+    h4: ['style'],
+    li: ['style'],
+  },
+  allowedSchemes: ['http', 'https', 'mailto'],
+  transformTags: {
+    a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer' }),
+  },
+};
+
+/**
+ * Renders a stored note body safely (spec `note-capture` → "XSS stripped"):
+ * the formatting whitelist survives, everything executable is removed.
+ */
+export function sanitizeNoteHtml(html: string): string {
+  if (html === '') {
+    return '';
+  }
+  return sanitizeHtml(html, SANITIZE_OPTIONS);
+}
 
 const ENTITIES: ReadonlyArray<[RegExp, string]> = [
   [/&nbsp;/gi, ' '],
