@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isDomainError } from './errors';
 import {
   createTasksApi,
+  loadHomeTasks,
   type DatabasesLike,
   type RawDocument,
   type TaskScope,
@@ -470,5 +471,58 @@ describe('domain error mapping (task 3.3)', () => {
       expect(failure.kind).toBe('unknown');
       expect(failure.cause).toBe(transport);
     }
+  });
+});
+
+describe('loadHomeTasks (glue for the `/` route, task 3.4)', () => {
+  it('builds the client from the session secret and reads the caller records', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 1, documents: [storedDocument('mine')] };
+    const seenSecrets: string[] = [];
+
+    const page = await loadHomeTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      false,
+      {
+        config,
+        databasesFor: (secret) => {
+          seenSecrets.push(secret);
+          return fake;
+        },
+      },
+    );
+
+    expect(seenSecrets).toEqual(['cookie-secret']);
+    expect(parsedQueries(fake.listCalls[0])).toEqual(
+      expect.arrayContaining([
+        { method: 'equal', attribute: 'createdBy', values: ['user-123'] },
+      ]),
+    );
+    expect(page.tasks.map((task) => task.$id)).toEqual(['mine']);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('drops the owner filter for admins so `/` shows every record', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = {
+      total: 2,
+      documents: [
+        storedDocument('a', { createdBy: 'user-a' }),
+        storedDocument('b', { createdBy: 'user-b' }),
+      ],
+    };
+
+    const page = await loadHomeTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      true,
+      { config, databasesFor: () => fake },
+    );
+
+    expect(hasQuery(parsedQueries(fake.listCalls[0]), 'equal', 'createdBy')).toBe(
+      false,
+    );
+    expect(page.tasks).toHaveLength(2);
   });
 });
