@@ -44,7 +44,7 @@ PR1–PR4 exceed 400 lines; stack on `main`, each green.
 
 ## Phase 4: PR3 — list-search-create (TDD)
 
-- [ ] 4.1 `src/app/page.tsx` + `src/components/task-list.tsx`: sorted cursor list (20/page). Test: 3.3 units. AC: later-first, pagination.
+- [x] 4.1 `src/app/page.tsx` + `src/components/task-list.tsx`: sorted cursor list (20/page). Test: 3.3 units. AC: later-first, pagination.
 - [ ] 4.2 Search box + `Query.search`, empty→unfiltered, next link. Test: search units. AC: user/admin/no-match scenarios.
 - [ ] 4.3 `src/app/nueva/page.tsx`, `src/actions/tasks.ts`, `src/components/task-form.tsx`: create + inline errors. Test: action units. AC: invalid blocked; past date kept.
 

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { Databases } from 'node-appwrite';
 import { logout } from '@/actions/auth';
+import { TaskList } from '@/components/task-list';
 import { loadEnv } from '@/lib/env';
 import { createSessionClient } from '@/lib/appwrite/clients';
 import { isDomainError } from '@/lib/appwrite/errors';
@@ -12,9 +13,10 @@ import {
 import { loadHomeTasks, type TaskPage } from '@/lib/appwrite/tasks';
 
 /**
- * Home (PR2 task 3.4): server-side list through the data layer — proves the
- * validation/data-access stack wires up with a real session. Visual polish
- * (search box, pagination UI, states) lands in PR3.
+ * Home (PR3 task 4.1): the task list UI for the signed-in caller — sorted
+ * cursor pages from the data layer, status/type badges, creator attribution,
+ * empty and error states (spec `task-listing`). Search (4.2) and the create
+ * entry point (4.3) land in the next commits of this batch.
  */
 export default async function HomePage() {
   const user = await getCurrentUser();
@@ -60,37 +62,17 @@ export default async function HomePage() {
             type="submit"
             className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
           >
-            Sign out
+            Cerrar sesión
           </button>
         </form>
       </header>
 
       <p className="text-sm text-neutral-600">
-        Signed in as <span className="font-medium">{user.email}</span>
-        {admin ? ' (admin)' : ''}
+        Sesión iniciada como <span className="font-medium">{user.email}</span>
+        {admin ? ' (administrador)' : ''}
       </p>
 
-      {page === null ? (
-        <p role="alert" className="text-sm text-red-700">
-          Could not load tasks. Please try again later.
-        </p>
-      ) : page.tasks.length === 0 ? (
-        <p className="text-sm text-neutral-500">No tasks yet.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {page.tasks.map((task) => (
-            <li
-              key={task.$id}
-              className="flex items-center justify-between rounded-md border border-neutral-300 px-3 py-2 text-sm"
-            >
-              <span className="font-medium">{task.title}</span>
-              <span className="text-neutral-500">
-                {task.date} {task.time} · {task.status}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <TaskList page={page} cursor="" />
     </main>
   );
 }
