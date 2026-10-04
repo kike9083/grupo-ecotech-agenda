@@ -79,6 +79,14 @@ export default async function HomePage({
           >
             Nueva tarea
           </Link>
+          {admin ? (
+            <Link
+              href="/admin"
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+            >
+              Administración
+            </Link>
+          ) : null}
           <form action={logout}>
             <button
               type="submit"

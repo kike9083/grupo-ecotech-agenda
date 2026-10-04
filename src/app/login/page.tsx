@@ -1,10 +1,5 @@
 import { login } from '@/actions/auth';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  credentials: 'Invalid email or password.',
-  missing: 'Email and password are required.',
-  expired: 'Your session has expired. Please sign in again.',
-};
+import { loginErrorMessage } from '@/lib/login-copy';
 
 export default async function LoginPage({
   searchParams,
@@ -12,12 +7,12 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  const message = error === undefined ? undefined : ERROR_MESSAGES[error];
+  const message = loginErrorMessage(error);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-4">
       <div>
-        <h1 className="text-2xl font-semibold">Sign in</h1>
+        <h1 className="text-2xl font-semibold">Iniciar sesión</h1>
         <p className="text-sm text-neutral-500">Grupo Ecotech agenda</p>
       </div>
 
@@ -30,7 +25,7 @@ export default async function LoginPage({
       <form action={login} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <label htmlFor="email" className="text-sm font-medium">
-            Email
+            Correo electrónico
           </label>
           <input
             id="email"
@@ -44,7 +39,7 @@ export default async function LoginPage({
 
         <div className="flex flex-col gap-1">
           <label htmlFor="password" className="text-sm font-medium">
-            Password
+            Contraseña
           </label>
           <input
             id="password"
@@ -60,7 +55,7 @@ export default async function LoginPage({
           type="submit"
           className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white"
         >
-          Sign in
+          Iniciar sesión
         </button>
       </form>
     </main>
