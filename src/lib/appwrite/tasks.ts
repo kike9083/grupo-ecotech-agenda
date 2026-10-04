@@ -70,9 +70,22 @@ export interface TaskFilters {
   creatorEmail?: string;
 }
 
+/**
+ * Fields shared by every scope (design D5): the cursor continues a page, the
+ * optional inclusive `dateFrom`/`dateTo` bounds narrow by the record `date`
+ * (the calendar grid range, then the home date filter), and `limit` overrides
+ * the default page size for non-paginated views like the calendar.
+ */
+export interface TaskScopeBase {
+  cursorAfter?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+}
+
 export type TaskScope =
-  | { admin: true; cursorAfter?: string; filters?: TaskFilters }
-  | { admin: false; ownerId: string; cursorAfter?: string };
+  | (TaskScopeBase & { admin: true; filters?: TaskFilters })
+  | (TaskScopeBase & { admin: false; ownerId: string });
 
 /** Read model per design D3 — no `searchText` on the wire to the UI. */
 export interface Task {
@@ -98,6 +111,12 @@ export interface TaskPage {
 }
 
 export const PAGE_SIZE = 20;
+
+/**
+ * Calendar views render the whole visible grid in one shot, so they raise the
+ * page size instead of paginating (spec `calendar-view` → "place every record").
+ */
+export const CALENDAR_PAGE_SIZE = 100;
 
 function toTask(doc: RawDocument): Task {
   return {
@@ -136,7 +155,7 @@ function toPage(result: {
  */
 function listQueries(scope: TaskScope): string[] {
   const queries = [
-    Query.limit(PAGE_SIZE),
+    Query.limit(scope.limit ?? PAGE_SIZE),
     Query.orderDesc('date'),
     Query.orderDesc('time'),
     // Undated notes sort last on `date` and are ordered by creation time
@@ -144,6 +163,19 @@ function listQueries(scope: TaskScope): string[] {
     Query.orderDesc('$createdAt'),
     Query.orderDesc('$id'),
   ];
+
+  // Inclusive date bounds (design D4/D5): both → `between`, one → the matching
+  // half-open comparison. Undated notes (`date=''`) drop out whenever a bound
+  // is set, which is correct for both the calendar grid and the date filter.
+  if (scope.dateFrom !== undefined && scope.dateFrom !== '') {
+    if (scope.dateTo !== undefined && scope.dateTo !== '') {
+      queries.push(Query.between('date', scope.dateFrom, scope.dateTo));
+    } else {
+      queries.push(Query.greaterThanEqual('date', scope.dateFrom));
+    }
+  } else if (scope.dateTo !== undefined && scope.dateTo !== '') {
+    queries.push(Query.lessThanEqual('date', scope.dateTo));
+  }
 
   if (!scope.admin) {
     queries.push(Query.equal('createdBy', scope.ownerId));
@@ -331,6 +363,44 @@ export async function loadHomeTasks(
   if (term !== '') {
     return api.searchTasks(term, scope);
   }
+  return api.listTasks(scope);
+}
+
+/** Inclusive grid bounds the `/calendario` route passes down (task 8.3). */
+export interface CalendarListParams {
+  from: string;
+  to: string;
+}
+
+/**
+ * Server-side results for the `/calendario` route: every record dated inside
+ * the visible grid range, ordered exactly like the list and read through the
+ * caller's session client (Appwrite still enforces document permissions). The
+ * range is inclusive and runs on the existing `date_time` index (design D4).
+ */
+export async function loadCalendarTasks(
+  user: { id: string },
+  sessionSecret: string,
+  admin: boolean,
+  deps: HomeTasksDeps,
+  params: CalendarListParams,
+): Promise<TaskPage> {
+  const api = createTasksApi(deps.databasesFor(sessionSecret), deps.config);
+  const scope: TaskScope = admin
+    ? {
+        admin: true,
+        dateFrom: params.from,
+        dateTo: params.to,
+        limit: CALENDAR_PAGE_SIZE,
+      }
+    : {
+        admin: false,
+        ownerId: user.id,
+        dateFrom: params.from,
+        dateTo: params.to,
+        limit: CALENDAR_PAGE_SIZE,
+      };
+
   return api.listTasks(scope);
 }
 

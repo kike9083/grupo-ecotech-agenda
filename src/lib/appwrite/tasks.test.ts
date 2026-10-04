@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { isDomainError } from './errors';
 import {
+  CALENDAR_PAGE_SIZE,
   createTasksApi,
   loadAdminTasks,
+  loadCalendarTasks,
   loadHomeTasks,
   type DatabasesLike,
   type RawDocument,
@@ -814,5 +816,121 @@ describe('admin filters (PR4 task 5.2, spec record-visibility → admin view)', 
         },
       ]),
     );
+  });
+});
+
+describe('calendar date range (PR8 task 8.3, spec calendar-view → Month grid)', () => {
+  it('emits an inclusive between query when both bounds are set', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 1, documents: [storedDocument('d')] };
+    const api = createTasksApi(fake, config);
+
+    await api.listTasks({
+      ...ownerScope,
+      dateFrom: '2026-09-28',
+      dateTo: '2026-11-01',
+    });
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(queries).toEqual(
+      expect.arrayContaining([
+        {
+          method: 'between',
+          attribute: 'date',
+          values: ['2026-09-28', '2026-11-01'],
+        },
+      ]),
+    );
+  });
+
+  it('uses greaterThanEqual for a lower bound only and lessThanEqual for an upper bound only', async () => {
+    const lower = new FakeDatabases();
+    lower.nextList = { total: 0, documents: [] };
+    await createTasksApi(lower, config).listTasks({
+      ...ownerScope,
+      dateFrom: '2026-10-01',
+    });
+    expect(parsedQueries(lower.listCalls[0])).toEqual(
+      expect.arrayContaining([
+        {
+          method: 'greaterThanEqual',
+          attribute: 'date',
+          values: ['2026-10-01'],
+        },
+      ]),
+    );
+    expect(hasQuery(parsedQueries(lower.listCalls[0]), 'lessThanEqual')).toBe(
+      false,
+    );
+
+    const upper = new FakeDatabases();
+    upper.nextList = { total: 0, documents: [] };
+    await createTasksApi(upper, config).listTasks({
+      ...ownerScope,
+      dateTo: '2026-10-15',
+    });
+    expect(parsedQueries(upper.listCalls[0])).toEqual(
+      expect.arrayContaining([
+        { method: 'lessThanEqual', attribute: 'date', values: ['2026-10-15'] },
+      ]),
+    );
+    expect(hasQuery(parsedQueries(upper.listCalls[0]), 'greaterThanEqual')).toBe(
+      false,
+    );
+  });
+
+  it('loads the grid range through the session secret, scoped to the owner', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = { total: 1, documents: [storedDocument('placed')] };
+    const seenSecrets: string[] = [];
+
+    const page = await loadCalendarTasks(
+      { id: 'user-123' },
+      'cookie-secret',
+      false,
+      {
+        config,
+        databasesFor: (secret) => {
+          seenSecrets.push(secret);
+          return fake;
+        },
+      },
+      { from: '2026-09-28', to: '2026-11-01' },
+    );
+
+    expect(seenSecrets).toEqual(['cookie-secret']);
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(queries).toEqual(
+      expect.arrayContaining([
+        {
+          method: 'between',
+          attribute: 'date',
+          values: ['2026-09-28', '2026-11-01'],
+        },
+        { method: 'equal', attribute: 'createdBy', values: ['user-123'] },
+        { method: 'limit', values: [CALENDAR_PAGE_SIZE] },
+      ]),
+    );
+    expect(page.tasks.map((task) => task.$id)).toEqual(['placed']);
+  });
+
+  it('does not add an owner filter for admins', async () => {
+    const fake = new FakeDatabases();
+    fake.nextList = {
+      total: 1,
+      documents: [storedDocument('other', { createdBy: 'someone-else' })],
+    };
+
+    await loadCalendarTasks(
+      { id: 'admin-1' },
+      'cookie-secret',
+      true,
+      { config, databasesFor: () => fake },
+      { from: '2026-09-28', to: '2026-11-01' },
+    );
+
+    const queries = parsedQueries(fake.listCalls[0]);
+    expect(hasQuery(queries, 'between', 'date')).toBe(true);
+    expect(hasQuery(queries, 'equal', 'createdBy')).toBe(false);
   });
 });

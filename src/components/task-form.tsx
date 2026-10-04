@@ -27,7 +27,7 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-export function TaskForm() {
+export function TaskForm({ defaultDate = '' }: { defaultDate?: string }) {
   const [state, formAction, pending] = useActionState<CreateTaskState, FormData>(
     createTaskAction,
     INITIAL_CREATE_STATE,
@@ -105,7 +105,7 @@ export function TaskForm() {
             id="date"
             name="date"
             type="date"
-            defaultValue={values.date}
+            defaultValue={values.date ?? defaultDate}
             aria-invalid={state.fieldErrors.date !== undefined}
             className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
           />
