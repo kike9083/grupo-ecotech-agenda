@@ -72,28 +72,28 @@ TDD note: config `strict_tdd: false`, but Vitest is installed (`npm test`) and t
 
 ## Phase 5: PR5 — attachments schema (~300)
 
-- [ ] 5.1 Infra (no tests possible — live infra): extend `scripts/provision-notebook.ts`: bucket `agenda-attachments` (`fileSecurity`, 30 MB, D3 extension list) + `attachments` collection (attrs `recordId`/`fileId`/`kind`/`name`/`mimeType`/`size`/`ownerId`, indexes `file_id` unique + `record_created`, perms mirror `tasks`). Spec: attachments#Attachment visibility. AC: matches D3.
-- [ ] 5.2 RED `src/lib/attachments.test.ts`: `validateAttachment` size/type matrix; `kindFromMime`. Spec: attachments#Attachment upload (Oversized or wrong type). AC: fails first.
-- [ ] 5.3 GREEN `src/lib/attachments.ts`.
-- [ ] 5.4 RED `src/lib/appwrite/attachments.test.ts`: doc payload perms mirror parent, list by `recordId`, unique `fileId`. Spec: attachments#Attachment visibility. AC: fake clients.
-- [ ] 5.5 GREEN `src/lib/appwrite/attachments.ts`.
+- [x] 5.1 Infra (no tests possible — live infra): extend `scripts/provision-notebook.ts`: bucket `agenda-attachments` (`fileSecurity`, 30 MB, D3 extension list) + `attachments` collection (attrs `recordId`/`fileId`/`kind`/`name`/`mimeType`/`size`/`ownerId`, indexes `file_id` unique + `record_created`, perms mirror `tasks`). Spec: attachments#Attachment visibility. AC: matches D3.
+- [x] 5.2 RED `src/lib/attachments.test.ts`: `validateAttachment` size/type matrix; `kindFromMime`. Spec: attachments#Attachment upload (Oversized or wrong type). AC: fails first.
+- [x] 5.3 GREEN `src/lib/attachments.ts`.
+- [x] 5.4 RED `src/lib/appwrite/attachments.test.ts`: doc payload perms mirror parent, list by `recordId`, unique `fileId`. Spec: attachments#Attachment visibility. AC: fake clients.
+- [x] 5.5 GREEN `src/lib/appwrite/attachments.ts`.
 
 ## Phase 6: PR6 — attachments upload (~360)
 
-- [ ] 6.1 RED `src/lib/attachment-flow.test.ts`: `performUpload` creates file+doc, rollback deletes file on doc failure; `performDelete` removes both. Specs: attachments#Upload failure handling, #Attachment deletion. AC: fails first.
-- [ ] 6.2 GREEN `src/lib/attachment-flow.ts`.
-- [ ] 6.3 `src/app/api/attachments/upload/route.ts`: multipart, session authorizes parent, validate, create. Spec: attachments#Attachment upload. Verified by route-handler unit (mocked session) + live probe.
-- [ ] 6.4 RED `src/app/api/attachments/upload/route.test.ts`: size/type/unauthorized → 400/401, nothing stored. Spec: attachments#Oversized or wrong type.
-- [ ] 6.5 GREEN route; `src/actions/attachments.ts` delete action. Spec: attachments#Attachment deletion.
-- [ ] 6.6 `src/components/attachment-form.tsx`: file input, inline Spanish errors ("Archivo demasiado grande", "Tipo no soportado") + retry. Spec: attachments#Upload failure handling.
+- [x] 6.1 RED `src/lib/attachment-flow.test.ts`: `performUpload` creates file+doc, rollback deletes file on doc failure; `performDelete` removes both. Specs: attachments#Upload failure handling, #Attachment deletion. AC: fails first.
+- [x] 6.2 GREEN `src/lib/attachment-flow.ts`.
+- [x] 6.3 `src/app/api/attachments/upload/route.ts`: multipart, session authorizes parent, validate, create. Spec: attachments#Attachment upload. Verified by route-handler unit (mocked session) + live probe.
+- [x] 6.4 RED `src/app/api/attachments/upload/route.test.ts`: size/type/unauthorized → 400/401, nothing stored. Spec: attachments#Oversized or wrong type.
+- [x] 6.5 GREEN route; `src/actions/attachments.ts` delete action. Spec: attachments#Attachment deletion.
+- [x] 6.6 `src/components/attachment-form.tsx`: file input, inline Spanish errors ("Archivo demasiado grande", "Tipo no soportado") + retry. Spec: attachments#Upload failure handling.
 
 ## Phase 7: PR7 — attachments display (~340)
 
-- [ ] 7.1 RED `src/app/api/attachments/[fileId]/route.test.ts`: 401 unauth, 404 unknown, 200 streams `mimeType`. Spec: attachments#Attachment visibility (Peer isolation/Admin read). AC: fails first.
-- [ ] 7.2 GREEN `src/app/api/attachments/[fileId]/route.ts`: session lookup by `fileId`, API-key `getFileView`, stream. Spec: attachments#Attachment display.
-- [ ] 7.3 `src/components/attachment-gallery.tsx` + `src/components/audio-player.tsx`: `<img src="/api/attachments/<fileId>">`, `<audio>`. Spec: attachments#Attachment display (Gallery and player). Verified by `tsc`/build.
-- [ ] 7.4 Wire attachment form/gallery into `src/components/task-form.tsx`. Spec: task-registration#Task attachments (Task with attachment).
-- [ ] 7.5 RED `src/lib/attachment-flow.test.ts` extension: admin vs peer read authorization. Spec: attachments#Attachment visibility.
+- [x] 7.1 RED `src/app/api/attachments/[fileId]/route.test.ts`: 401 unauth, 404 unknown, 200 streams `mimeType`. Spec: attachments#Attachment visibility (Peer isolation/Admin read). AC: fails first.
+- [x] 7.2 GREEN `src/app/api/attachments/[fileId]/route.ts`: session lookup by `fileId`, API-key `getFileView`, stream. Spec: attachments#Attachment display.
+- [x] 7.3 `src/components/attachment-gallery.tsx` + `src/components/audio-player.tsx`: `<img src="/api/attachments/<fileId>">`, `<audio>`. Spec: attachments#Attachment display (Gallery and player). Verified by `tsc`/build.
+- [x] 7.4 Wire attachment form/gallery into `src/components/task-form.tsx`. Spec: task-registration#Task attachments (Task with attachment).
+- [x] 7.5 RED `src/lib/attachment-flow.test.ts` extension: admin vs peer read authorization. Spec: attachments#Attachment visibility.
 
 ## Phase 8: PR8 — calendar (~380)
 
