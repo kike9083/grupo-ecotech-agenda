@@ -3,10 +3,11 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { Databases, Storage } from 'node-appwrite';
 import { logout } from '@/actions/auth';
+import { LinkStatus } from '@/components/link-status';
 import { LoadingState } from '@/components/loading-state';
 import { SearchForm } from '@/components/search-form';
 import { TaskList } from '@/components/task-list';
-import { loadEnv } from '@/lib/env';
+import { loadEnv, loadReminderEnv } from '@/lib/env';
 import {
   ATTACHMENTS_BUCKET_ID,
   ATTACHMENTS_COLLECTION_ID,
@@ -21,8 +22,51 @@ import {
   getCurrentUser,
   isAdmin,
 } from '@/lib/appwrite/session';
+import {
+  TELEGRAM_SUBSCRIPTIONS_COLLECTION_ID,
+  createTelegramSubscriptionsApi,
+} from '@/lib/appwrite/telegram';
 import { loadHomeTasks, type TaskPage } from '@/lib/appwrite/tasks';
 import { parseHomeQuery, validateDateRange, type RawSearchParams } from '@/lib/search-query';
+import {
+  deriveLinkState,
+  telegramEntry,
+  type TelegramLinkState,
+} from '@/lib/telegram-view';
+
+/**
+ * Status for the list's Telegram entry (task 7.7, spec `task-listing` →
+ * "Entry shows current status"): ONE session-scoped query wrapped in
+ * try/catch — a failure degrades to the unlinked badge and can never break
+ * the task list. The env-disabled path skips the query entirely.
+ */
+async function loadTelegramEntryState(
+  secret: string,
+  userId: string,
+): Promise<TelegramLinkState> {
+  const configured = loadReminderEnv().enabled;
+  if (!configured) {
+    return deriveLinkState(null, false);
+  }
+
+  try {
+    const env = loadEnv();
+    const api = createTelegramSubscriptionsApi(
+      new Databases(createSessionClient(secret)),
+      {
+        databaseId: env.APPWRITE_DATABASE_ID,
+        collectionId: TELEGRAM_SUBSCRIPTIONS_COLLECTION_ID,
+      },
+    );
+    const doc = await api.getByUser(userId);
+    return deriveLinkState(
+      doc === null ? null : { chatId: doc.chatId, active: doc.active },
+      configured,
+    );
+  } catch {
+    return deriveLinkState(null, configured);
+  }
+}
 
 /**
  * The data region of the home route, wrapped in its own <Suspense> (verify
@@ -142,6 +186,8 @@ export default async function HomePage({
     await searchParams,
   );
   const admin = await isAdmin();
+  const telegramState = await loadTelegramEntryState(secret, user.id);
+  const telegram = telegramEntry(telegramState);
 
   // An invalid range never runs a query (spec task-search → Invalid range):
   // the form shows the inline error and the list falls back to the plain data.
@@ -173,6 +219,13 @@ export default async function HomePage({
           >
             Calendario
           </Link>
+          <Link
+            href={telegram.href}
+            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+          >
+            {telegram.label}
+          </Link>
+          <LinkStatus state={telegramState} />
           {admin ? (
             <Link
               href="/admin"

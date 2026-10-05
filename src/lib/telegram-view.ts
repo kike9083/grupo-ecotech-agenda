@@ -100,3 +100,28 @@ export type TelegramBadge = 'Vinculado' | 'Sin vincular';
 export function telegramBadgeLabel(state: TelegramLinkState): TelegramBadge {
   return state === 'linked' ? 'Vinculado' : 'Sin vincular';
 }
+
+/** The list entry's immutable address (spec `task-listing` → entry point). */
+export const TELEGRAM_ENTRY = { href: '/telegram', label: 'Telegram' } as const;
+
+/** What the list header renders for the entry: address + status badge. */
+export interface TelegramEntry {
+  href: string;
+  label: string;
+  badge: TelegramBadge;
+}
+
+/**
+ * Entry descriptor for EVERY state (spec `task-listing` → "Entry present
+ * when unlinked" / "Entry shows current status"): the label and href are
+ * constant — only the badge follows the state, and a failed status query
+ * maps through `deriveLinkState(null, …)` to the unlinked badge without
+ * ever throwing.
+ */
+export function telegramEntry(state: TelegramLinkState): TelegramEntry {
+  return {
+    href: TELEGRAM_ENTRY.href,
+    label: TELEGRAM_ENTRY.label,
+    badge: telegramBadgeLabel(state),
+  };
+}

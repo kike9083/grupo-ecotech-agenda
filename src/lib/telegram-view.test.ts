@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   deriveLinkState,
   telegramBadgeLabel,
+  telegramEntry,
   telegramPageCopy,
   type TelegramLinkState,
 } from './telegram-view';
@@ -92,5 +93,38 @@ describe('telegramBadgeLabel (spec task-listing → Entry shows current status)'
     expect(telegramBadgeLabel('unlinked')).toBe('Sin vincular');
     expect(telegramBadgeLabel('blocked')).toBe('Sin vincular');
     expect(telegramBadgeLabel('not-configured')).toBe('Sin vincular');
+  });
+});
+
+describe('task-listing → Telegram linking entry point', () => {
+  const states: TelegramLinkState[] = [
+    'not-configured',
+    'unlinked',
+    'linked',
+    'blocked',
+  ];
+
+  it('keeps the entry label and href present regardless of link state', () => {
+    for (const state of states) {
+      expect(telegramEntry(state)).toMatchObject({
+        href: '/telegram',
+        label: 'Telegram',
+      });
+    }
+  });
+
+  it('falls back to the unlinked badge when the status query failed — never throws', () => {
+    expect(() => deriveLinkState(null, true)).not.toThrow();
+
+    const entry = telegramEntry(deriveLinkState(null, true));
+    expect(entry).toMatchObject({ href: '/telegram', label: 'Telegram' });
+    expect(entry.badge).toBe('Sin vincular');
+  });
+
+  it('reflects the linked status while still opening the linking page', () => {
+    const entry = telegramEntry(deriveLinkState({ chatId: '555', active: true }, true));
+
+    expect(entry.href).toBe('/telegram');
+    expect(entry.badge).toBe('Vinculado');
   });
 });
