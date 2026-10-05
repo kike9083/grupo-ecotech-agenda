@@ -211,3 +211,64 @@ Route (app)                         Size  First Load JS
 **FAIL**
 
 Gates are green (tsc 0 / 316 tests / build) and 29 of 31 spec scenarios are compliant, but `attachments → Attachment upload` fails live: any upload above 10 MB returns an empty HTTP 500 because the middleware body limit (default 10 MB, `next.config.ts` empty) truncates the request before the app's 30 MB validation can run. This breaks the advertised 30 MB capability and the "Oversized or wrong type" scenario's required inline Spanish error. The defect is bounded (files <10 MB and the wrong-type rejection work; no data loss) and the fix is small (middleware matcher / body-size config), but the change is not archive-ready until it is addressed.
+
+---
+
+## Re-verification (fix batch)
+
+**Type**: TARGETED re-run of F1 (CRITICAL), Warning 2, Suggestion 3 + regression spot-check — not a full re-verify.
+**Verified at**: commit `56e311d` (`56e311dd94951fdde613c1575e453ac973331e5d`) — local `main` == Easypanel service commit SHA == deployed image (action `cmuussbca001g07nr5ft3dhm9`, "docs(openspec): record verify-fix evidence…", status `done` 2026-10-05 05:18).
+**Fix commits under test**: `dead3bb` (middleware matcher), `0cd8f97` (`formatCreatedAt`), `68f2b00` (size-limit copy derivation).
+
+### Gates
+
+| Gate | Result |
+|------|--------|
+| `npx tsc --noEmit` | ✅ exit 0 |
+| `npx vitest run` | ✅ **327 passed / 0 failed, 25 files** (was 316/24 — +11 tests) |
+| `npm run build` | ✅ (`ƒ Middleware 39.3 kB`, 11/11 static pages) |
+
+### Item verdicts
+
+| # | Item | Verdict | Live evidence (deployed build) |
+|---|------|---------|-------------------------------|
+| F1 | Upload body cap / oversized rejection | ✅ **FIXED** | Authenticated `POST /api/attachments/upload`: **12,000,000 B → 201** (doc `6ac335c9001c69190503` + file `6ac335c800328a9f63f5`, `sizeOriginal=12000000`); **30,000,001 B → 400** `{"error":"El archivo es demasiado grande (máximo 30 MB)."}` with **nothing stored** (attachment/file totals unchanged by the rejected attempt); **5,000,000 B → 201**; **anonymous upload → 401** `{"error":"Tu sesión ha expirado…"}` (documented behavior change: route-level auth instead of the middleware's 307). No empty 500 anywhere. |
+| W2 | Creation timestamp on task/request rows | ✅ **FIXED** | My task row and the foreign `pagar el agua` row both render `Creada el 5 de octubre de 2026`; note rows (mine + foreign `prueba 1`) render `Anotado el 5 de octubre de 2026` and **no** `Creada el` inside their own row. Consistent Spanish copy across both branches (`task-list.tsx` line 114 `formatCreatedAt`). |
+| S3 | Constant / copy / bucket cap agreement | ✅ **FIXED** | `MAX_ATTACHMENT_BYTES = 30000000` is the single source; `MAX_ATTACHMENT_MB = MAX_ATTACHMENT_BYTES / 1_000_000` derives the copy template `máximo ${MAX_ATTACHMENT_MB} MB`; bucket `maximumFileSize = 30000000` (live Appwrite `GET /storage/buckets/agenda-attachments`); live 400 body matches the derived copy **byte-for-byte**. |
+
+### Regression spot-check
+
+| Check | Result |
+|-------|--------|
+| Anon `GET /` → `307 /login` | ✅ |
+| Login QA admin → `303 /`, `aw_session` non-empty (392 chars, HttpOnly) · member (398 chars) | ✅ |
+| `GET /admin` → admin **200**, member **404** | ✅ |
+| `GET /calendario` → 200 | ✅ |
+| Note create → `303 /?noted=1`, sanitized render (`<h2>`/`<strong>` preserved; `<script>alert(1)</script>` and `onerror=` stripped) | ✅ |
+| `?q=<token>` finds both records | ✅ |
+| Date range composes with `q` (in-range hit / out-of-range → "Sin resultados.") | ✅ |
+| `from > to` → inline `La fecha "desde" no puede ser posterior a la fecha "hasta".` + neutral hint + **no query executed** | ✅ |
+
+Probe-artifact note: three checks initially reported FAIL because the probe's regexes missed HTML escaping (`&quot;`, RSC flight `\u003c…\u003e`) and an `<li>`-window bleed into the following row. Each was re-checked against the raw server-rendered `<li>` blocks and decoded payload — all three are PASS on the real markup (listed above).
+
+### Spec scenarios re-verified
+
+| Spec → scenario | Result |
+|---|---|
+| `attachments · Attachment upload · Multiple valid files` | ✅ COMPLIANT (12 MB + 5 MB stored under one `recordId`) |
+| `attachments · Attachment upload · Oversized or wrong type` | ✅ COMPLIANT (400 Spanish copy, nothing stored) — previously FAILING (F1) |
+| `task-listing · Creation timestamp display · Timestamp` | ✅ COMPLIANT (previously PARTIAL/SHOULD) |
+
+### Cleanup & safety (incident rule honoured)
+
+- Pre-delete audit: `tasks=4` (2 mine + 2 foreign), `attachments=2` (both mine), `bucket=2` (both mine) — 11/11 audit checks passed before any deletion.
+- Deleted **only** by exact captured ID, one by one: attachment docs `6ac335c9001c69190503`, `6ac335f2003d5a3baa8d`; bucket files `6ac335c800328a9f63f5`, `6ac335f2002f08acecf3`; task doc `6ac335b2002bcbc30cf4`; note doc `6ac335b300165d8ff158` (all `204`).
+- Post-state: `tasks=2`, `attachments=0`, bucket files `0`. **Both foreign records still present and untouched**: `6ac32aa8000b0ae3dd09` "prueba 1", `6ac32b0b001e105fd467` "pagar el agua" (owner `6a1030c90014c56a9568`).
+- QA sessions logged out (admin + member `303 /login`, cookie cleared); anon `GET /` → `307` again.
+- Repository untouched by this run: no code changes, working tree clean at `56e311d`.
+
+### Re-verification verdict
+
+**PASS**
+
+All three findings from the original report are fixed and live-proven on the deployed build matching `main` HEAD; gates are green (tsc 0 · 327/327 in 25 files · build OK), the regression spot-check shows no breakage, probe data was fully cleaned by exact ID, and the two real user records survived. The original F1/W2/S3 findings above are superseded by this section; the pre-existing caveats (data-loss incident needs a human decision; Suggestion 4 API-key audit) remain outside this change's scope. **Archive-ready pending orchestrator/human sign-off on the incident.**
