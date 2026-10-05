@@ -104,3 +104,106 @@ revert. Documented in `README.md` → "Telegram reminders → Rollback" (task 7.
 2. `ReminderPollRepo` needs a 4th method `deactivate(userId)` beyond design D5's list (spec block → no further sends requires the write somewhere).
 3. Size split: PR5 → 2 commits (411 prod lines), PR6 → 6a/6b (261 prod lines in 6b), PR7 → 7a as 2 commits (340 + 161 prod lines) + 7b docs.
 4. Phase 7 added the concrete `saveToken` (deferred by design note) and a domain `unlinkTelegramLink` (design line 182: unlink covered by "domain tests with fake repo").
+
+---
+
+# Independent re-verification (targeted) + live E2E — 2026-10-05
+
+Run by the orchestrator after the `sdd-apply` self-audit above; the dedicated
+`sdd-verify` sub-agent was cancelled twice, so these checks were executed
+directly. Only the gaps not covered by sections 8.1–8.3 were re-run.
+
+## 1. Independent gate re-run
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | exit 0 |
+| `npx vitest run` | **468/468**, 35 files, 3.76 s |
+| `npm run build` (production, nixpacks) | OK — `npm ci` + `next build --turbopack` in the deploy `cmuvq8pg9002a07nrftdgetsq`, finished 20:54:37 GMT; routes `/`, `/telegram`, `/api/telegram/link`, `/api/attachments/*`, `/calendario` emitted, middleware 48 kB |
+
+The build log carries two Turbopack **warnings** in `src/lib/reminder-runner.ts`
+(`process.on/off('SIGTERM')` "not supported in the Edge Runtime"). Benign: the
+file is reachable only from `src/instrumentation.ts`, which is Node-only; the
+build compiled and type-checked successfully. Recorded as a non-blocking note.
+
+## 2. Boot without env — n/a for prod, verified in-container instead
+
+The spec requirement "app boots without env" is proven by `env.test.ts` +
+`reminder-runner.test.ts` (0 timers, one log line) and was **not** replayed
+against the deployed container, because production necessarily ships WITH the
+env set. The live equivalent was checked instead — container `8a8799256cb3`
+`printenv`:
+
+```
+FORCE_NODE_FETCH=1
+REMINDERS_ENABLED=true
+TELEGRAM_BOT_USERNAME=agendaecotechbot
+TELEGRAM_BOT_TOKEN len=46
+TELEGRAM_LINK_SECRET len=64
+```
+
+`TELEGRAM_CALLBACK_ORIGIN` absent ⇒ `DEFAULT_CALLBACK_ORIGIN`
+(`http://127.0.0.1:3000`), correct for the single-container loopback self-POST.
+
+Runner liveness (not just env presence): one established TCP connection to
+remote port `443` (`01BB` in `/proc/net/tcp`) = the `getUpdates` 50 s long-poll
+against `api.telegram.org`. Container `Up 5:51` at probe time.
+
+## 3. Middleware exclusion of the bot callback (design D4)
+
+Probed live against the deployed app:
+
+| Request | Response | Meaning |
+|---|---|---|
+| `POST /api/telegram/link` no `x-link-secret` | `401 {"error":"unauthorized"}` | reached the **route** ⇒ matcher does not intercept (would have been a `307` to `/login`) |
+| `POST /api/telegram/link` wrong `x-link-secret` | `401 {"error":"unauthorized"}` | route rejects before touching storage |
+| `GET /api/telegram/link` | `405` | route handler exists, POST-only |
+
+## 4. Live end-to-end (tasks 8.4 / 8.5)
+
+1. **Env setup** — 4 keys appended to `.env.local` (gitignored) and set one at a
+   time on Easypanel (`set_env_var` is read-modify-write ⇒ serial). Service now
+   has 11 vars, 3 masked (`APPWRITE_API_KEY`, `TELEGRAM_BOT_TOKEN`,
+   `TELEGRAM_LINK_SECRET`). No `NEXT_PUBLIC_*TELEGRAM*` anywhere.
+2. **Deploy** — push `8669590..2e461fd`, auto-deploy `cmuvq8pg9002a07` `done`.
+3. **Mint** — logged in via the real login form (HTTP 303 + `aw_session`), `GET
+   /telegram` showed the *not configured → Sin vincular* state, POSTed the
+   bound-action envelope from the page HTML, received a deep link
+   `https://t.me/agendaecotechbot?start=…`. Re-mint invalidated the first token
+   (single-use/re-mint semantics exercised live).
+4. **`/start` exchange** — human opened the deep link from their own Telegram
+   client; `GET /telegram` then rendered **"Vinculado" / "Tu cuenta está
+   vinculada…"** ⇒ token validated, `chatId` stored, token consumed, bot
+   confirmed in chat.
+5. **Delivery** — created task `PROBE recordatorio e2e 8.5` with `date=2026-10-05`,
+   `time=16:08` (Panama, 3 min in the past), owner `agenda-qa-01`. After one
+   60 s poll the document read **`notified=True`**. Since marking happens only
+   after the channel reports `delivered`, Telegram answered 200 ⇒ exactly one
+   `Recordatorio:` message was sent to the linked chat.
+6. **Cleanup** — the probe was the only object created; audit printed all three
+   documents first, then `DELETE` by its exact id `6ac412a20008ab1e1f26` →
+   **204**. Post-state `total=2`: `6ac32aa8000b0ae3dd09` *prueba 1* and
+   `6ac32b0b001e105fd467` *pagar el agua* both intact. No enumeration-delete
+   was performed (incident rule).
+
+### Live vs unit-tested (honest split for 8.5)
+
+| Step of 8.5 | Evidence |
+|---|---|
+| push → auto-deploy (single replica) | live (`list_containers` → 1 container) |
+| mint → deep link → `/start` → "Vinculado" | live |
+| expired / reused token rejected | unit (`telegram-link.test.ts`) — re-mint killing the prior token observed live |
+| dated+timed record fires exactly one message | live (`notified=True` inside one poll) |
+| `notified=true` | live |
+| restart → no duplicate | unit (`reminders.test.ts`, persisted `notified:true` ⇒ 0 sends). Not replayed: restarting production would only re-read the same external `notified` state |
+| unlink → no sends | unit (`telegram-link.test.ts`, `appwrite/telegram.test.ts`). Not replayed: the subscription was left linked deliberately so the operator can keep exercising the flow from `/telegram` |
+
+## Final verdict
+
+**PASS.** All three gaps the targeted pass was scoped to are closed, plus the
+live end-to-end that was blocking 8.4/8.5. Remaining known deviations are the
+four recorded in `apply-progress.md` (none behavioral). Outstanding non-blocking
+item from the previous report: the `users.read` API-key audit scope
+(Suggestion 4).
+
+**Blocked items: none.**
