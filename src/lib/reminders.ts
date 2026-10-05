@@ -1,7 +1,10 @@
+import type { NotificationChannel } from './notification-channel';
+
 /**
- * Pure scheduler decide (design D2/D6) — zero I/O, zero imports, no provider
- * symbol anywhere in this file (enforced by the source scan, task 6.9: spec
- * `notification-channels` → "Scheduler depends only on the interface").
+ * Pure scheduler decide (design D2/D6) — zero I/O, zero imports beyond the
+ * channel contract, no provider symbol anywhere in this file (enforced by the
+ * source scan, task 6.9: spec `notification-channels` → "Scheduler depends
+ * only on the interface").
  *
  * Time is compared as fixed-width Panama wall-clock strings
  * (`YYYY-MM-DDTHH:mm`), so lexicographic comparison IS chronological. Panama
@@ -17,6 +20,8 @@ export interface ReminderCandidate {
   $id: string;
   /** `task` or `note` — both remind when dated with a time (spec Eligibility). */
   type: string;
+  /** Reminder copy: the same title the list shows (`Recordatorio: <title>`). */
+  title: string;
   /** Panama wall-clock day (`YYYY-MM-DD`); `''` = undated → never eligible. */
   date: string;
   /** Zero-padded 24 h time (`HH:mm`); `''` = no time → never eligible. */
@@ -104,4 +109,91 @@ export function isEligible(
 
   const scheduled = `${record.date}T${record.time}`;
   return windowStart(nowWall) <= scheduled && scheduled <= nowWall;
+}
+
+/** Active link the poll delivers to — `chatId === ''` is unlinked (D7). */
+export interface ReminderSubscription {
+  userId: string;
+  chatId: string;
+}
+
+/**
+ * Storage the poll drives (design D2 seam list + D5's block write). The
+ * production shape is `createRemindersApi()`; tests use an in-memory repo, so
+ * scheduling is provable with no network, no credentials and no Appwrite
+ * (spec `notification-channels` → "Seam proven with a fake channel").
+ */
+export interface ReminderPollRepo {
+  /** Due candidates narrowed by the indexed query (day bounds inclusive). */
+  listDue(windowStart: string, nowWall: string): Promise<ReminderCandidate[]>;
+  /** Send-then-mark write — called ONLY after a `delivered` outcome (D5). */
+  markNotified(id: string): Promise<void>;
+  /** Active linked chats (`active: true` and a non-empty chat id). */
+  listActiveSubs(): Promise<ReminderSubscription[]>;
+  /** 403 from the provider → deactivate the creator's subscription. */
+  deactivate(userId: string): Promise<void>;
+}
+
+/**
+ * One scheduler cycle (spec `reminder-delivery`, design D5/D6).
+ *
+ * Rules, in order:
+ * 1. resolve the Panama wall clock once — every bound below compares against
+ *    that single string (design D2);
+ * 2. read candidates + active links from the repo (the fake-able seam);
+ * 3. **sequential** per-record delivery: eligibility → `channel.send` →
+ *    `markNotified` immediately after `delivered` (never batched — the
+ *    send-then-mark duplicate window stays per record, D5);
+ * 4. outcomes: `delivered` → marked; `transient` → untouched, retried by the
+ *    next poll while inside the window; `blocked` → the creator's
+ *    subscription deactivates AND is dropped from this run's link map, so no
+ *    further send targets that user (linking spec → "Deactivated
+ *    subscription on block"; the spec id itself stays out of this file — the
+ *    source scan forbids the provider word anywhere in the scheduler).
+ *
+ * Nothing here knows what a provider is — only `NotificationChannel`.
+ */
+export async function runReminderPoll(params: {
+  channel: NotificationChannel;
+  repo: ReminderPollRepo;
+  /** Injected clock (epoch ms): tests pin `now`, production passes `Date.now()`. */
+  now: number;
+}): Promise<void> {
+  const nowWall = panamaWallClock(params.now);
+  const due = await params.repo.listDue(windowStart(nowWall), nowWall);
+  const subscriptions = await params.repo.listActiveSubs();
+
+  const linked = new Map<string, string>();
+  for (const subscription of subscriptions) {
+    if (subscription.chatId !== '') {
+      linked.set(subscription.userId, subscription.chatId);
+    }
+  }
+  const linkedCreators = new Set(linked.keys());
+
+  for (const record of due) {
+    if (!isEligible(record, nowWall, linkedCreators)) {
+      continue;
+    }
+    const chatId = linked.get(record.createdBy);
+    if (chatId === undefined) {
+      continue;
+    }
+
+    const outcome = await params.channel.send(
+      chatId,
+      `Recordatorio: ${record.title}`,
+    );
+
+    if (outcome.status === 'delivered') {
+      await params.repo.markNotified(record.$id);
+    } else if (outcome.status === 'blocked') {
+      await params.repo.deactivate(record.createdBy);
+      linked.delete(record.createdBy);
+      linkedCreators.delete(record.createdBy);
+    }
+    // `transient`: notified stays untouched — the record remains eligible for
+    // the next poll (spec "Unnotified after failure" / "Transient failure
+    // retried").
+  }
 }

@@ -1,4 +1,13 @@
-import { loadReminderEnv, type ReminderEnv } from './env';
+import { Databases } from 'node-appwrite';
+import { loadEnv, loadReminderEnv, type ReminderEnv } from './env';
+import { createAdminClient } from './appwrite/clients';
+import { createRemindersApi } from './appwrite/reminders';
+import {
+  TELEGRAM_SUBSCRIPTIONS_COLLECTION_ID,
+  createTelegramSubscriptionsApi,
+} from './appwrite/telegram';
+import { runReminderPoll } from './reminders';
+import { createTelegramChannel } from './telegram-channel';
 import {
   GET_UPDATES_TIMEOUT_SECONDS,
   TelegramCallError,
@@ -382,7 +391,7 @@ export function bootRunners(deps: ReminderRunnerDeps = {}): RunnerHandle {
   const bot = (deps.createBot ?? ((token: string) => createTelegramApi({ token })))(
     env.botToken,
   );
-  const tick = deps.tick ?? defaultSchedulerTick;
+  const tick = deps.tick ?? createSchedulerTick(env.botToken);
   const botState = { offset: 0 };
 
   void runLoop({
@@ -422,9 +431,34 @@ function defaultRegisterSignal(handler: () => void): () => void {
 }
 
 /**
- * Scheduler cycle placeholder: PR5 lands the lifecycle, PR6 task 6.8 wires
- * `runReminderPoll({ channel, repo, now })` in here.
+ * Production scheduler cycle (task 6.8): the one composition root of PR6 —
+ * Appwrite admin client + subscriptions + reminders repo (design D2 data
+ * flow) bound to the provider channel (design D6), driving the pure poll.
+ *
+ * Built lazily inside the cycle (never at module load) and re-resolved every
+ * tick: an unconfigured or broken dependency throws into `runLoop`'s catch,
+ * so the loop backs off instead of crashing the process (design D1). The bot
+ * token comes from the already-validated enabled env, never from a raw read.
  */
-async function defaultSchedulerTick(): Promise<void> {
-  // Wired to the reminder poll in task 6.8.
+function createSchedulerTick(botToken: string): () => Promise<void> {
+  return async () => {
+    const env = loadEnv();
+    const databases = new Databases(createAdminClient(env));
+
+    const subscriptions = createTelegramSubscriptionsApi(databases, {
+      databaseId: env.APPWRITE_DATABASE_ID,
+      collectionId: TELEGRAM_SUBSCRIPTIONS_COLLECTION_ID,
+    });
+    const repo = createRemindersApi(
+      databases,
+      {
+        databaseId: env.APPWRITE_DATABASE_ID,
+        tasksCollectionId: env.APPWRITE_TASKS_COLLECTION_ID,
+      },
+      subscriptions,
+    );
+    const channel = createTelegramChannel(createTelegramApi({ token: botToken }));
+
+    await runReminderPoll({ channel, repo, now: Date.now() });
+  };
 }
