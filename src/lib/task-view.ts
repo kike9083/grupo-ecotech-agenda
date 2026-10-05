@@ -63,21 +63,37 @@ const MONTHS_ES = [
 ] as const;
 
 /**
- * Spanish creation-timestamp copy for a note (spec `note-capture` → "Creation
- * timestamp display"): "Anotado el 4 de octubre de 2026". Reads the date part
- * of the Appwrite `$createdAt` ISO string directly (no `Date`/timezone shift)
- * and falls back to the raw value when it is not an ISO timestamp.
+ * Spanish date portion of an Appwrite `$createdAt` ISO string, e.g.
+ * "4 de octubre de 2026". Reads the date part directly (no `Date`/timezone
+ * shift) and falls back to the raw value when it is not an ISO timestamp.
  */
-export function formatNotedAt(createdAt: string): string {
+function formatSpanishDate(createdAt: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(createdAt);
   if (match === null) {
-    return `Anotado el ${createdAt}`;
+    return createdAt;
   }
 
   const [, year, month, day] = match;
   const monthName = MONTHS_ES[Number(month) - 1] ?? month;
 
-  return `Anotado el ${Number(day)} de ${monthName} de ${year}`;
+  return `${Number(day)} de ${monthName} de ${year}`;
+}
+
+/**
+ * Spanish creation-timestamp copy for a note (spec `note-capture` → "Creation
+ * timestamp display"): "Anotado el 4 de octubre de 2026".
+ */
+export function formatNotedAt(createdAt: string): string {
+  return `Anotado el ${formatSpanishDate(createdAt)}`;
+}
+
+/**
+ * Spanish creation-timestamp copy for a task/request row (spec `task-listing`
+ * → "Creation timestamp display"): "Creada el 4 de octubre de 2026". Matches
+ * `formatCreatedBy`'s feminine "Creada" agreement (tarea/solicitud).
+ */
+export function formatCreatedAt(createdAt: string): string {
+  return `Creada el ${formatSpanishDate(createdAt)}`;
 }
 
 /**

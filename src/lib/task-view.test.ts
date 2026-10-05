@@ -8,6 +8,7 @@ import {
   allowedTransitions,
   buildListHref,
   emptyMessage,
+  formatCreatedAt,
   formatCreatedBy,
   formatNotedAt,
   noteHeading,
@@ -70,6 +71,24 @@ describe('formatNotedAt (spec note-capture → Creation timestamp display)', () 
 
   it('falls back to the raw value when the timestamp is not an ISO date', () => {
     expect(formatNotedAt('sin fecha')).toBe('Anotado el sin fecha');
+  });
+});
+
+describe('formatCreatedAt (spec task-listing → Creation timestamp display)', () => {
+  it('renders the creation timestamp of a task in Spanish', () => {
+    expect(formatCreatedAt('2026-10-04T19:38:25.692+00:00')).toBe(
+      'Creada el 4 de octubre de 2026',
+    );
+  });
+
+  it('formats the first day of a month without a leading zero', () => {
+    expect(formatCreatedAt('2026-01-01T00:00:00.000+00:00')).toBe(
+      'Creada el 1 de enero de 2026',
+    );
+  });
+
+  it('falls back to the raw value when the timestamp is not an ISO date', () => {
+    expect(formatCreatedAt('sin fecha')).toBe('Creada el sin fecha');
   });
 });
 

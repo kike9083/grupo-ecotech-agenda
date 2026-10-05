@@ -11,6 +11,7 @@ import {
   RETRY_LABEL,
   buildListHref,
   emptyMessage,
+  formatCreatedAt,
   formatCreatedBy,
   formatNotedAt,
   noteHeading,
@@ -110,6 +111,7 @@ export function TaskList({
                     <span className="font-mono">
                       {task.date} {task.time}
                     </span>
+                    <span>{formatCreatedAt(task.$createdAt)}</span>
                     <span className="rounded-full border border-neutral-300 px-2 py-0.5 font-medium">
                       {statusLabel(task.status)}
                     </span>
