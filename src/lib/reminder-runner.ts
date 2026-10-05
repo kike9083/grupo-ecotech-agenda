@@ -215,6 +215,14 @@ export const LINK_CALLBACK_PATH = '/api/telegram/link';
 export const LINK_SECRET_HEADER = 'x-link-secret';
 
 /**
+ * Confirmation sent ONLY after the callback answered 200 (spec
+ * `telegram-linking` → "Bot callback validation" — a 404 must stay silent so
+ * a dead token never leaks whether it existed).
+ */
+export const LINK_CONFIRMATION_TEXT =
+  'Vinculación correcta. Ya recibirás tus recordatorios aquí.';
+
+/**
  * One bot cycle: long poll, then hand every update to the `/start` handler.
  * The offset only advances past terminal outcomes — a transient one keeps it
  * so Telegram re-delivers (design D4).
@@ -224,6 +232,7 @@ async function pollBotOnce(params: {
   env: Extract<ReminderEnv, { enabled: true }>;
   deps: ReminderRunnerDeps;
   signal: AbortSignal;
+  sleep: (ms: number) => Promise<void>;
   state: { offset: number };
 }): Promise<void> {
   const updates = await params.bot.getUpdates({
@@ -241,9 +250,32 @@ async function pollBotOnce(params: {
   }
 }
 
+/** `/start[?@bot] [token]` → the deep-link token, or undefined. */
+function startToken(update: TelegramUpdate): string | undefined {
+  const text = update.message?.text;
+  if (text === undefined) {
+    return undefined;
+  }
+  const match = /^\/start(?:@\w+)?(?:\s+(\S+))?/.exec(text);
+  return match?.[1];
+}
+
 /**
- * Dispatch one update (design D4). PR5 task 5.4 fills in the `/start` exchange
- * -- until then every update is terminal and simply skipped.
+ * Dispatch one update (design D4). Returns `true` when the outcome is
+ * terminal — the offset may advance past it — and `false` when Telegram
+ * should re-deliver the same update on the next poll.
+ *
+ * Contract:
+ * - not `/start <token>` → terminal, silent (nothing to link);
+ * - callback 200 → confirmation, terminal;
+ * - callback 404 (and any other 4xx) → terminal, silent (dead token: a 404
+ *   must not be retried forever, and must never be answered);
+ * - callback 5xx / network failure → transient, silent;
+ * - confirmation send `transient` (429 → `retryAfterMs`) → wait out the
+ *   retry delay and stay transient so the whole exchange is re-delivered.
+ *
+ * Logs only describe *what* failed — never the token, the chat id or the
+ * bot token (spec `telegram-linking` → "Bot callback validation").
  */
 async function handleUpdate(
   update: TelegramUpdate,
@@ -252,12 +284,49 @@ async function handleUpdate(
     env: Extract<ReminderEnv, { enabled: true }>;
     deps: ReminderRunnerDeps;
     signal: AbortSignal;
-    state: { offset: number };
+    sleep: (ms: number) => Promise<void>;
   },
 ): Promise<boolean> {
-  void update;
-  void params;
-  return true;
+  const token = startToken(update);
+  if (token === undefined || update.message?.chat === undefined) {
+    return true;
+  }
+
+  const postLink = params.deps.postLink ?? defaultPostLink;
+  let status: number;
+  try {
+    const result = await postLink({
+      origin: params.env.callbackOrigin,
+      secret: params.env.linkSecret,
+      token,
+      chatId: String(update.message.chat.id),
+    });
+    status = result.status;
+  } catch {
+    status = 0;
+  }
+
+  if (status === 0 || status >= 500) {
+    return false;
+  }
+  if (status !== 200) {
+    return true;
+  }
+
+  const outcome = await params.bot.sendMessage(
+    String(update.message.chat.id),
+    LINK_CONFIRMATION_TEXT,
+    params.signal,
+  );
+  if (outcome.status !== 'transient') {
+    return true;
+  }
+
+  const retryAfterMs = outcome.retryAfterMs;
+  if (typeof retryAfterMs === 'number' && retryAfterMs > 0) {
+    await params.sleep(retryAfterMs);
+  }
+  return false;
 }
 
 /**
@@ -321,7 +390,14 @@ export function bootRunners(deps: ReminderRunnerDeps = {}): RunnerHandle {
     intervalMs,
     isRunning: () => record.running,
     step: () =>
-      pollBotOnce({ bot, env, deps, signal: abort.signal, state: botState }),
+      pollBotOnce({
+        bot,
+        env,
+        deps,
+        signal: abort.signal,
+        sleep: sleepKit.sleep,
+        state: botState,
+      }),
     sleep: sleepKit.sleep,
     log,
   });

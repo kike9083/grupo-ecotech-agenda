@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { register } from '@/instrumentation';
 import type { ReminderEnv } from './env';
 import {
+  LINK_CONFIRMATION_TEXT,
   bootRunners,
   type ReminderRunnerBot,
   type ReminderRunnerDeps,
   type RunnerHandle,
 } from './reminder-runner';
+import { TelegramCallError, type TelegramUpdate } from './telegram';
 
 /**
  * PR5 task 5.1 (design D1) — runner lifecycle:
@@ -316,6 +318,204 @@ describe('SIGTERM shutdown (design D1 — stop + abort in-flight getUpdates)', (
     await vi.advanceTimersByTimeAsync(INTERVAL_MS * 10);
     await settle();
     expect(createBot).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * PR5 task 5.3/5.4 (design D4) — the bot loop turns `/start <token>` into the
+ * secret-header self-POST against `POST /api/telegram/link`, confirms ONLY on
+ * 200, and advances the long-poll offset only past terminal outcomes so a
+ * transient failure is re-delivered by Telegram.
+ */
+function startUpdate(
+  updateId: number,
+  text: string,
+  chatId = 555000111,
+): TelegramUpdate {
+  return { update_id: updateId, message: { chat: { id: chatId }, text } };
+}
+
+/** Bot fed from a queue of responses; records every requested offset. */
+function scriptedBot(batches: Array<TelegramUpdate[] | Error>) {
+  const offsets: number[] = [];
+  const bot: ReminderRunnerBot = {
+    getUpdates: async (params) => {
+      offsets.push(params.offset ?? 0);
+      const next = batches.shift();
+      if (next === undefined) {
+        return [];
+      }
+      if (next instanceof Error) {
+        throw next;
+      }
+      return next;
+    },
+    sendMessage: vi.fn(async () => ({ status: 'delivered' as const })),
+  };
+  return { bot, offsets };
+}
+
+describe('bot loop /start exchange (spec telegram-linking → Bot callback validation)', () => {
+  function bootBot(params: {
+    batches: Array<TelegramUpdate[] | Error>;
+    postLink: (request: {
+      origin: string;
+      secret: string;
+      token: string;
+      chatId: string;
+    }) => Promise<{ status: number }>;
+    sendMessage?: ReminderRunnerBot['sendMessage'];
+    logs?: string[];
+    sleeps?: number[];
+  }) {
+    const { bot, offsets } = scriptedBot(params.batches);
+    if (params.sendMessage !== undefined) {
+      bot.sendMessage = params.sendMessage;
+    }
+    bootRunners({
+      reminderEnv: enabledEnv(),
+      createBot: () => bot,
+      postLink: params.postLink,
+      tick: parkedTick,
+      sleep: recordingSleep(params.sleeps ?? []),
+      log: (message) => params.logs?.push(message),
+      registerSignal: () => () => {},
+    });
+    return { bot, offsets };
+  }
+
+  async function nextCycle(): Promise<void> {
+    await vi.advanceTimersByTimeAsync(INTERVAL_MS);
+    await settle();
+  }
+
+  it('self-POSTs {token, chatId} with the shared secret and confirms on 200', async () => {
+    const postLink = vi.fn(async () => ({ status: 200 }));
+    const { bot, offsets } = bootBot({
+      batches: [[startUpdate(100, '/start tok-1234567890')]],
+      postLink,
+    });
+    await settle();
+
+    expect(postLink).toHaveBeenCalledTimes(1);
+    expect(postLink).toHaveBeenCalledWith({
+      origin: 'http://127.0.0.1:3000',
+      secret: 'link-secret',
+      token: 'tok-1234567890',
+      chatId: '555000111',
+    });
+    expect(bot.sendMessage).toHaveBeenCalledTimes(1);
+    expect(bot.sendMessage).toHaveBeenCalledWith(
+      '555000111',
+      LINK_CONFIRMATION_TEXT,
+      expect.any(AbortSignal),
+    );
+
+    // 200 is terminal: the next long poll starts past this update.
+    await nextCycle();
+    expect(offsets).toEqual([0, 101]);
+  });
+
+  it('sends no confirmation on 404 but still advances past the dead token', async () => {
+    const postLink = vi.fn(async () => ({ status: 404 }));
+    const { bot, offsets } = bootBot({
+      batches: [[startUpdate(7, '/start expired-token')]],
+      postLink,
+    });
+    await settle();
+
+    expect(postLink).toHaveBeenCalledTimes(1);
+    expect(bot.sendMessage).not.toHaveBeenCalled();
+
+    await nextCycle();
+    expect(offsets).toEqual([0, 8]);
+  });
+
+  it('keeps the offset when the callback POST fails transiently', async () => {
+    const postLink = vi.fn(async () => ({ status: 500 }));
+    const { bot, offsets } = bootBot({
+      batches: [[startUpdate(42, '/start tok-1234567890')]],
+      postLink,
+    });
+    await settle();
+
+    expect(bot.sendMessage).not.toHaveBeenCalled();
+
+    await nextCycle();
+    // The update is re-delivered, exactly as design D4 requires.
+    expect(offsets).toEqual([0, 0]);
+  });
+
+  it('keeps the offset and honors retryAfterMs when the confirmation is rate-limited', async () => {
+    const sleeps: number[] = [];
+    const postLink = vi.fn(async () => ({ status: 200 }));
+    const { offsets } = bootBot({
+      batches: [[startUpdate(10, '/start tok-1234567890')]],
+      postLink,
+      sleeps,
+      sendMessage: vi.fn(async () => ({
+        status: 'transient' as const,
+        retryAfterMs: 7_000,
+      })),
+    });
+    await settle();
+
+    // 429 → transient + retry_after: the loop waits it out before re-polling.
+    expect(sleeps[0]).toBe(7_000);
+    await vi.advanceTimersByTimeAsync(7_000);
+    await settle();
+    await nextCycle();
+    expect(offsets).toEqual([0, 0]);
+  });
+
+  it('advances past messages that are not a /start command', async () => {
+    const postLink = vi.fn(async () => ({ status: 200 }));
+    const { bot, offsets } = bootBot({
+      batches: [[startUpdate(3, 'hola, ¿qué tal?')]],
+      postLink,
+    });
+    await settle();
+
+    expect(postLink).not.toHaveBeenCalled();
+    expect(bot.sendMessage).not.toHaveBeenCalled();
+
+    await nextCycle();
+    expect(offsets).toEqual([0, 4]);
+  });
+
+  it('ignores a bare /start with no token and advances', async () => {
+    const postLink = vi.fn(async () => ({ status: 200 }));
+    const { offsets } = bootBot({
+      batches: [[startUpdate(9, '/start')]],
+      postLink,
+    });
+    await settle();
+
+    expect(postLink).not.toHaveBeenCalled();
+
+    await nextCycle();
+    expect(offsets).toEqual([0, 10]);
+  });
+
+  it('never logs the token, the chat id or the bot token (spec telegram-linking → Bot callback validation)', async () => {
+    const logs: string[] = [];
+    const { bot } = bootBot({
+      batches: [
+        [startUpdate(1, '/start tok-super-secret-token')],
+        new TelegramCallError('getUpdates', 500),
+      ],
+      postLink: async () => ({ status: 200 }),
+      logs,
+    });
+    await settle();
+    await nextCycle();
+
+    const haystack = logs.join('\n');
+    expect(logs.length).toBeGreaterThan(0);
+    expect(haystack).not.toContain('tok-super-secret-token');
+    expect(haystack).not.toContain('555000111');
+    expect(haystack).not.toContain('bot-token-secret');
+    expect(bot.sendMessage).toHaveBeenCalledTimes(1);
   });
 });
 
