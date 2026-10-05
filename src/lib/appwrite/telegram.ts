@@ -251,6 +251,24 @@ export function createTelegramSubscriptionsApi(
     },
 
     /**
+     * Mint seam behind `TelegramLinkMintRepo` (design D4 — the concrete
+     * `saveToken` lands with the phase 7 wiring): overwrite whatever token is
+     * pending so every previously minted deep link dies with it. Only the
+     * token fields — never the binding.
+     */
+    async saveToken(
+      documentId: string,
+      token: string,
+      tokenExpiresAt: string,
+    ): Promise<TelegramSubscription> {
+      try {
+        return await patch(documentId, { token, tokenExpiresAt });
+      } catch (error) {
+        throw toDomainError(error);
+      }
+    },
+
+    /**
      * Telegram 403 (spec `telegram-linking` → "Blocked bot deactivates"):
      * deactivate only — the chat id stays so the linking page can show the
      * re-link prompt instead of pretending the user never linked.

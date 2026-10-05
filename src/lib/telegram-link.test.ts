@@ -5,9 +5,11 @@ import {
   exchangeLinkToken,
   generateLinkToken,
   mintTelegramLink,
+  unlinkTelegramLink,
   type TelegramLinkDoc,
   type TelegramLinkExchangeRepo,
   type TelegramLinkMintRepo,
+  type TelegramLinkUnlinkRepo,
 } from './telegram-link';
 
 /**
@@ -27,7 +29,12 @@ const TEN_MINUTES_MS = 10 * 60 * 1000;
 type StoredDoc = TelegramLinkDoc & { userId: string };
 
 /** In-memory repo: every method records its calls so tests can assert writes. */
-class FakeRepo implements TelegramLinkExchangeRepo, TelegramLinkMintRepo {
+class FakeRepo
+  implements
+    TelegramLinkExchangeRepo,
+    TelegramLinkMintRepo,
+    TelegramLinkUnlinkRepo
+{
   readonly docs: Map<string, StoredDoc>;
   readonly saveTokenCalls: Array<{
     documentId: string;
@@ -36,6 +43,7 @@ class FakeRepo implements TelegramLinkExchangeRepo, TelegramLinkMintRepo {
   }> = [];
   readonly linkCalls: Array<{ documentId: string; chatId: string }> = [];
   readonly upsertCalls: string[] = [];
+  readonly unlinkCalls: string[] = [];
   private autoId = 0;
 
   constructor(docs: StoredDoc[] = []) {
@@ -98,6 +106,28 @@ class FakeRepo implements TelegramLinkExchangeRepo, TelegramLinkMintRepo {
     }
     doc.chatId = chatId;
     doc.active = true;
+    doc.token = '';
+    doc.tokenExpiresAt = '';
+    return doc;
+  }
+
+  async getByUser(userId: string): Promise<StoredDoc | null> {
+    return this.docByUserId(userId) ?? null;
+  }
+
+  /**
+   * Mirrors the storage-layer `unlink` contract (the wire truth is asserted
+   * in `appwrite/telegram.test.ts`): reset the binding and any pending token,
+   * leave the one-per-user `userId` alone.
+   */
+  async unlink(documentId: string): Promise<StoredDoc> {
+    this.unlinkCalls.push(documentId);
+    const doc = this.docs.get(documentId);
+    if (doc === undefined) {
+      throw new Error(`unknown document ${documentId}`);
+    }
+    doc.chatId = '';
+    doc.active = false;
     doc.token = '';
     doc.tokenExpiresAt = '';
     return doc;
@@ -443,5 +473,51 @@ describe('spec telegram-linking → Deactivated subscription on block → Re-lin
       token: '',
       tokenExpiresAt: '',
     });
+  });
+});
+
+describe('spec telegram-linking → Link status and unlink → Unlink', () => {
+  it('resets { chatId, active, token, tokenExpiresAt } to empty/false and keeps userId', async () => {
+    const repo = new FakeRepo();
+    const created = await repo.upsertSubscription(USER);
+    await repo.saveToken(created.$id, 'pending-token', '2026-03-04T10:10:00.000Z');
+    const linked = repo.docById(created.$id);
+    if (linked === undefined) throw new Error('seed failed');
+    linked.chatId = CHAT;
+    linked.active = true;
+
+    const result = await unlinkTelegramLink({ userId: USER, repo });
+
+    expect(result).toEqual({ status: 'unlinked' });
+    expect(repo.unlinkCalls).toEqual([created.$id]);
+    expect(repo.docByUserId(USER)).toMatchObject({
+      chatId: '',
+      active: false,
+      token: '',
+      tokenExpiresAt: '',
+      userId: USER,
+    });
+  });
+
+  it('never writes for a user with no subscription row', async () => {
+    const repo = new FakeRepo();
+
+    await expect(unlinkTelegramLink({ userId: 'user-ghost', repo })).resolves.toEqual({
+      status: 'not-linked',
+    });
+
+    expect(repo.unlinkCalls).toEqual([]);
+  });
+});
+
+describe('deep-link privacy (spec telegram-linking → Link initiation)', () => {
+  it('carries only the token — no chat id, no state, no hash', () => {
+    const link = buildDeepLink(`@${BOT_USERNAME}`, 'tok_only');
+
+    expect(link).toBe(`https://t.me/${BOT_USERNAME}?start=tok_only`);
+    const url = new URL(link);
+    expect([...url.searchParams.keys()]).toEqual(['start']);
+    expect(url.searchParams.get('start')).toBe('tok_only');
+    expect(url.hash).toBe('');
   });
 });

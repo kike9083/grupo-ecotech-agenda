@@ -48,6 +48,17 @@ export interface TelegramLinkMintRepo {
   ): Promise<TelegramLinkDoc>;
 }
 
+/**
+ * Unlink seam (design D8): resolve the caller's row, then reset the binding.
+ * The reset itself (`chatId ''`, `active false`, token fields `''`) lives in
+ * the storage layer's `unlink`, wire-asserted in `appwrite/telegram.test.ts`;
+ * this domain only orchestrates, keeping the session action three lines thin.
+ */
+export interface TelegramLinkUnlinkRepo {
+  getByUser(userId: string): Promise<TelegramLinkDoc | null>;
+  unlink(documentId: string): Promise<TelegramLinkDoc>;
+}
+
 /** A freshly minted link: what the UI shows as a one-shot deep link. */
 export interface MintedTelegramLink {
   token: string;
@@ -101,6 +112,29 @@ export async function mintTelegramLink(params: {
     expiresAt,
     documentId: doc.$id,
   };
+}
+
+/** Result of an unlink (spec `telegram-linking` → "Unlink"). */
+export type UnlinkLinkResult =
+  | { status: 'unlinked' }
+  | { status: 'not-linked' };
+
+/**
+ * Remove the chat binding for `userId` (spec `telegram-linking` → "Unlink",
+ * design D8): resolve the caller's one-per-user row and delegate the reset to
+ * the storage layer. A user with no row never writes — there is nothing to
+ * unlink.
+ */
+export async function unlinkTelegramLink(params: {
+  userId: string;
+  repo: TelegramLinkUnlinkRepo;
+}): Promise<UnlinkLinkResult> {
+  const doc = await params.repo.getByUser(params.userId);
+  if (doc === null) {
+    return { status: 'not-linked' };
+  }
+  await params.repo.unlink(doc.$id);
+  return { status: 'unlinked' };
 }
 
 /**

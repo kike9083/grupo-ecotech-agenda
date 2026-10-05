@@ -368,3 +368,21 @@ describe('error mapping', () => {
     }
   });
 });
+
+describe('saveToken (phase 7 wiring — design D4 concrete mint seam)', () => {
+  it('writes token and tokenExpiresAt onto the caller document', async () => {
+    const fake = new FakeDatabases();
+    const api = createTelegramSubscriptionsApi(fake, config);
+
+    await api.saveToken('sub-1', 'tok_abc', '2026-03-04T10:10:00.000Z');
+
+    expect(fake.updateCalls).toEqual([
+      {
+        databaseId: 'agenda',
+        collectionId: 'telegram_subscriptions',
+        documentId: 'sub-1',
+        data: { token: 'tok_abc', tokenExpiresAt: '2026-03-04T10:10:00.000Z' },
+      },
+    ]);
+  });
+});
