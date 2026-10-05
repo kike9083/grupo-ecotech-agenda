@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Attachment, AttachmentRecord } from '@/lib/appwrite/attachments';
-import { MAX_ATTACHMENT_BYTES } from '@/lib/attachments';
+import { ATTACHMENT_ERROR_MESSAGES, MAX_ATTACHMENT_BYTES } from '@/lib/attachments';
 import {
   ATTACHMENT_FAILURE_MESSAGES,
   attachmentFailureStatus,
@@ -336,5 +336,14 @@ describe('failure mapping (route contract)', () => {
     expect(ATTACHMENT_FAILURE_MESSAGES['unsupported-type']).toMatch(/no soportado/i);
     expect(ATTACHMENT_FAILURE_MESSAGES.unauthorized).toMatch(/permiso/i);
     expect(ATTACHMENT_FAILURE_MESSAGES['not-found']).toMatch(/encontr/i);
+  });
+
+  it('reuses the validation copy so route and form state the same cap', () => {
+    expect(ATTACHMENT_FAILURE_MESSAGES['too-large']).toBe(
+      ATTACHMENT_ERROR_MESSAGES['too-large'],
+    );
+    expect(ATTACHMENT_FAILURE_MESSAGES['unsupported-type']).toBe(
+      ATTACHMENT_ERROR_MESSAGES['unsupported-type'],
+    );
   });
 });

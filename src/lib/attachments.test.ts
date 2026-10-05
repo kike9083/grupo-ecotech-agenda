@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ATTACHMENT_ERROR_MESSAGES,
   MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_MB,
   kindFromMime,
   mimeTypeFor,
   validateAttachment,
@@ -114,5 +115,28 @@ describe('validateAttachment (spec attachments → Oversized or wrong type)', ()
   it('exposes Spanish copy for both rejection reasons', () => {
     expect(ATTACHMENT_ERROR_MESSAGES['too-large']).toMatch(/demasiado grande/i);
     expect(ATTACHMENT_ERROR_MESSAGES['unsupported-type']).toMatch(/no soportado/i);
+  });
+});
+
+/**
+ * Verify suggestion 3 (cap alignment): the byte cap, the provisioned bucket
+ * `maximumFileSize` (30,000,000 — cannot change without re-provisioning) and
+ * the user-facing Spanish copy must state the SAME limit. The constant is
+ * authoritative; the copy is derived from it so the three cannot drift.
+ */
+describe('cap alignment (verify suggestion 3 → constant, bucket, copy)', () => {
+  it('pins the authoritative cap at the provisioned bucket value', () => {
+    expect(MAX_ATTACHMENT_BYTES).toBe(30_000_000);
+  });
+
+  it('states the cap in MB derived from the byte constant', () => {
+    expect(MAX_ATTACHMENT_MB).toBe(MAX_ATTACHMENT_BYTES / 1_000_000);
+    expect(MAX_ATTACHMENT_MB).toBe(30);
+  });
+
+  it('derives the Spanish too-large copy from the same constant', () => {
+    expect(ATTACHMENT_ERROR_MESSAGES['too-large']).toBe(
+      `El archivo es demasiado grande (máximo ${MAX_ATTACHMENT_MB} MB).`,
+    );
   });
 });

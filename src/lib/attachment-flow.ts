@@ -5,6 +5,7 @@ import type {
   AttachmentRecord,
 } from '@/lib/appwrite/attachments';
 import {
+  ATTACHMENT_ERROR_MESSAGES,
   validateAttachment,
   type AttachmentRejectionReason,
 } from '@/lib/attachments';
@@ -32,8 +33,10 @@ export const ATTACHMENT_FAILURE_MESSAGES: Record<
   AttachmentFailureReason,
   string
 > = {
-  'too-large': 'El archivo es demasiado grande (máximo 30 MB).',
-  'unsupported-type': 'Tipo de archivo no soportado.',
+  // Rejection copy is shared with the validator so the route's JSON and the
+  // form's inline error always state the same cap (verify suggestion 3).
+  'too-large': ATTACHMENT_ERROR_MESSAGES['too-large'],
+  'unsupported-type': ATTACHMENT_ERROR_MESSAGES['unsupported-type'],
   unauthorized: 'No tienes permiso para modificar los adjuntos de este registro.',
   'not-found': 'No se encontró el registro o el adjunto.',
   'session-expired': 'Tu sesión ha expirado. Inicia sesión de nuevo.',

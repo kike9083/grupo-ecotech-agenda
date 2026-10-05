@@ -11,8 +11,16 @@ export type AttachmentKind = 'image' | 'audio';
 
 export type AttachmentRejectionReason = 'too-large' | 'unsupported-type';
 
-/** Appwrite's 30 MB cap, matching the provisioned bucket (design D3). */
+/**
+ * Appwrite's 30 MB cap, matching the provisioned bucket's `maximumFileSize`
+ * (30,000,000 — verify suggestion 3 decision: the decimal constant is
+ * authoritative over design D3's earlier 31,457,280/30 MiB figure, so the
+ * constant, the bucket and the Spanish copy all state the same limit).
+ */
 export const MAX_ATTACHMENT_BYTES = 30000000;
+
+/** Cap in MB, derived so the user-facing copy cannot drift from the constant. */
+export const MAX_ATTACHMENT_MB = MAX_ATTACHMENT_BYTES / 1_000_000;
 
 const IMAGE_MIME = [
   'image/jpeg',
@@ -48,7 +56,7 @@ const EXTENSION_MIME: Readonly<Record<string, string>> = {
 
 /** Spanish copy shown inline by the upload form (spec → "inline Spanish error"). */
 export const ATTACHMENT_ERROR_MESSAGES: Record<AttachmentRejectionReason, string> = {
-  'too-large': 'El archivo es demasiado grande (máximo 30 MB).',
+  'too-large': `El archivo es demasiado grande (máximo ${MAX_ATTACHMENT_MB} MB).`,
   'unsupported-type': 'Tipo de archivo no soportado.',
 };
 

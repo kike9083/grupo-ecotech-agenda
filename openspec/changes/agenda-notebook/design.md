@@ -35,7 +35,7 @@ Derivation: `buildSearchText(title, plainTextFromHtml(bodyHtml)).slice(0,700)`. 
 
 ### D3 — Attachments: new bucket + collection, proxy-served (no temporary URLs)
 
-Bucket `agenda-attachments`: `fileSecurity:true`, `maximumFileSize:31457280` (30 MB), `allowedFileExtensions:['jpg','jpeg','png','webp','heic','webm','mp3','wav','ogg','m4a','mp4','aac']` (mirrors precedent `service-report-images`/`-audio`).
+Bucket `agenda-attachments`: `fileSecurity:true`, `maximumFileSize:30000000` (30 MB decimal — verify suggestion 3: `MAX_ATTACHMENT_BYTES = 30_000_000` is authoritative; the earlier 31,457,280/30 MiB figure in this line was superseded so the constant, the provisioned bucket and the Spanish copy "máximo 30 MB" agree), `allowedFileExtensions:['jpg','jpeg','png','webp','heic','webm','mp3','wav','ogg','m4a','mp4','aac']` (mirrors precedent `service-report-images`/`-audio`).
 
 `attachments` collection: `documentSecurity:true`, collection `[create("users"), read("team:admins")]`, doc `[read/write("user:<ownerId>")]` — mirrors `tasks`. Attributes: `recordId`(str 36, req), `fileId`(str 36, req), `kind`(enum `image|audio`, req), `name`(str 255, req), `mimeType`(str 100, req), `size`(int, req), `ownerId`(str 36, req). `createdAt` uses Appwrite `$createdAt` (no custom attribute — no drift). Indexes: `file_id` unique key (`fileId`), `record_created` key (`recordId` asc, `$createdAt` asc).
 
