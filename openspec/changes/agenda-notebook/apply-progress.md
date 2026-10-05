@@ -377,3 +377,26 @@ Revert commits `37c0bef`…`ff6a3cc`. No schema change this batch (the calendar/
 
 - **Next recommended**: **sdd-verify**. Point it at the unproven items above and the incident. Use `agenda-qa@grupoecotech.com` (or a rotated admin password) for live checks.
 - **Note for the orchestrator**: this apply must NOT be reported as a clean success — the slice is code-complete and gates green, but a real production record was lost during the 10.5 probe and needs a human decision.
+
+## Verify-fix batch (re-entry from verify — F1 / Warning 2 / Suggestion 3)
+
+Applied 2026-10-05 after `verify-report.md`. Strict TDD throughout; all three fixes live-verified on production.
+
+| Finding | Root cause | Fix | Evidence (TDD + live) | Commit |
+|---------|-----------|-----|------------------------|--------|
+| **F1 (CRITICAL)** — upload returns empty 500 for bodies > 10 MB | `src/middleware.ts` matcher included `api/attachments/upload`; Next 15.5 buffers the request body at the middleware's 10 MB default before the route runs `request.formData()`, so the app's 30 MB Spanish validation never executed | Excluded the route from the matcher; the route self-authenticates via `getCurrentUser()` → 401 JSON for anonymous. Literal pattern inlined in `src/middleware.ts` (Turbopack cannot statically parse an imported/spread `config.matcher`); drift-guard test reads the file source | RED→GREEN `middleware-matcher.test.ts` 3/3. LIVE (deploy `cmuusjhok001c07nr7txkhezj`): 5 MB → 201; **12,000,000 B → 201** (pre-fix empty 500); **30,000,001 B → 400** `{"error":"El archivo es demasiado grande (máximo 30 MB)."}` with nothing stored; anon upload → 401; anon `GET /` → 307 (presence gate preserved) | `dead3bb` |
+| **Warning 2** — task/request rows omit `$createdAt` | `task-list.tsx` never rendered the creation timestamp | `formatCreatedAt` ("Creada el …") in `src/lib/task-view.ts`, wired into the non-note row branch | RED observed (`formatCreatedAt is not a function`, 3 fails) → GREEN 31/31 `task-view.test.ts`. LIVE: `GET /` 200, probe row rendered with `Creada el ` copy | `0cd8f97` |
+| **Suggestion 3** — cap constant/copy/design drift | Three sources of truth: `provision-notebook.ts` 30,000,000 (decimal), design.md `30 * 1024 * 1024` (MiB), hardcoded copy "máximo 30 MB" | `MAX_ATTACHMENT_BYTES = 30000000` authoritative (bucket `maximumFileSize` = 30000000); new `MAX_ATTACHMENT_MB` derives the copy; `attachment-flow.ts` reuses `ATTACHMENT_ERROR_MESSAGES`; design.md D3 updated with the decision note. Design's 31,457,280 superseded | RED observed (2 fails, `MAX_ATTACHMENT_MB` undefined) → GREEN; approval test added before dedupe refactor. LIVE: the 400 body matches the derived copy byte-for-byte | `68f2b00` |
+
+**Gates (local)**: `npx tsc --noEmit` exit 0 · `npx vitest run` **327/327** (25 files, +11 vs verify's 316) · `npm run build` OK (`ƒ Middleware 39.2 kB`).
+
+**Behavior change (documented)**: anonymous `POST /api/attachments/upload` now returns **401 JSON** from the route instead of the middleware's 307 login redirect. The agenda-auth spec only mandates the redirect for "agenda pages"; the upload route already self-authenticated.
+
+**Scope notes**: admin list (`admin-task-list.tsx`) intentionally unchanged (main task-listing spec "Admin view attribution" only requires the creator's own rows); Suggestion 4 (API-key audit) and the data-loss incident out of this batch's scope; `verify-report.md` committed unmodified.
+
+**Live probe hygiene**: probe task `fx7988fa09020745d1` + its 2 attachment docs/bucket files deleted by exact captured IDs after audit (post-state: attachments 0, bucket files 0). Two foreign tasks (`6ac32aa8000b0ae3dd09` "prueba 1", `6ac32b0b001e105fd467` "pagar el agua", owner `6a1030c90014c56a9568`, created 04:42/04:43 before this run) were audited and left untouched.
+
+## Next
+
+- **Recommended**: targeted **sdd-verify** re-run for this fix batch (matrix above is the acceptance evidence; verify-report.md's items 1–3 from the previous run remain unproven).
+- **Note for the orchestrator**: the slice's prior caveat still stands — the data-loss incident needs a human decision (notify/recreate), unchanged by this batch.
