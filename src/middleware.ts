@@ -45,12 +45,15 @@ export function middleware(request: NextRequest): NextResponse {
  * seam, and `middleware-matcher.test.ts` asserts the two never drift.
  *
  * `/api/attachments/upload` is excluded so Next.js does not buffer its body
- * at the 10 MB middleware cap (verify F1); every other route keeps the
- * presence gate, and the upload route authenticates itself via
- * `getCurrentUser()` (401 when the session is missing).
+ * at the 10 MB middleware cap (verify F1); `/api/telegram/link` is excluded
+ * because the bot callback has no `aw_session` cookie and the route
+ * self-authenticates with the `x-link-secret` shared secret (design D4).
+ * Every other route keeps the presence gate, and the upload route
+ * authenticates itself via `getCurrentUser()` (401 when the session is
+ * missing).
  */
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/attachments/upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/attachments/upload|api/telegram/link|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

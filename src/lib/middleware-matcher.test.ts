@@ -39,3 +39,27 @@ describe('middleware matcher (verify F1 — attachment upload body limit)', () =
     expect(source).toContain(`'${sourceForm}'`);
   });
 });
+
+/**
+ * PR4 task 4.5 (design D4 callback, same precedent as verify finding F1): the
+ * bot's `POST /api/telegram/link` carries no `aw_session` cookie, so the
+ * presence gate would redirect it to `/` and the exchange would never happen.
+ * The route self-authenticates with the shared secret instead.
+ */
+describe('middleware matcher (design D4 — telegram callback exclusion)', () => {
+  it('excludes the telegram link callback so the gate cannot swallow it', () => {
+    expect(matchesMiddleware('/api/telegram/link')).toBe(false);
+  });
+
+  it('still gates the app routes and the attachment proxy', () => {
+    expect(matchesMiddleware('/')).toBe(true);
+    expect(matchesMiddleware('/nota')).toBe(true);
+    expect(matchesMiddleware('/api/attachments/abc123')).toBe(true);
+  });
+
+  it('keeps the static-asset and upload exclusions untouched', () => {
+    expect(matchesMiddleware('/api/attachments/upload')).toBe(false);
+    expect(matchesMiddleware('/_next/static/chunk.js')).toBe(false);
+    expect(matchesMiddleware('/favicon.ico')).toBe(false);
+  });
+});

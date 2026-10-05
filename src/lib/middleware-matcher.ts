@@ -10,6 +10,11 @@
  * other path while letting the upload route stream its body; the route still
  * authenticates with `getCurrentUser()`, so authorization is unchanged.
  *
+ * `/api/telegram/link` is excluded for a second, independent reason (design
+ * D4): the bot's callback carries no `aw_session` cookie, so the gate would
+ * redirect it to `/` before the exchange could run. The route self-authenticates
+ * with the `x-link-secret` shared secret instead.
+ *
  * Kept as a plain module (no `next/server` import) so the matcher contract is
  * unit-testable in the node environment. `src/middleware.ts` inlines the same
  * string (Turbopack cannot statically parse an imported `config.matcher`);
@@ -17,7 +22,7 @@
  * sync.
  */
 export const MIDDLEWARE_MATCHER = [
-  '/((?!_next/static|_next/image|favicon.ico|api/attachments/upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  '/((?!_next/static|_next/image|favicon.ico|api/attachments/upload|api/telegram/link|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
 ] as const;
 
 /**

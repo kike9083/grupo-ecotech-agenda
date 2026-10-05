@@ -66,6 +66,12 @@ export interface ActiveSubscription {
 /** Page size for the active-subscription listing (read fully via cursor). */
 export const SUBSCRIPTION_PAGE_SIZE = 100;
 
+/**
+ * Fixed collection id, created by `scripts/provision-reminders.ts` (design D7):
+ * same convention as `ATTACHMENTS_COLLECTION_ID` — no env var per resource.
+ */
+export const TELEGRAM_SUBSCRIPTIONS_COLLECTION_ID = 'telegram_subscriptions';
+
 function toSubscription(doc: TelegramRawDocument): TelegramSubscription {
   return {
     $id: doc.$id,
