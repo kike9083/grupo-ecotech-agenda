@@ -27,14 +27,15 @@ browser platforms (no CORS).
 
 ```
 src/
-  app/            routes: / (list+search), /login, /nueva, /nota, /calendario, /admin
-  actions/        server actions (auth, tasks, notes, attachments)
+  app/            routes: / (list+search), /login, /nueva, /nota, /calendario, /telegram, /admin
+  actions/        server actions (auth, tasks, notes, attachments, telegram)
   components/     presentational components
   lib/
     appwrite/     clients, session, login-transport, data access, errors
     validation/   input validation (task, note)
     env.ts        centralized server-only env contract
   middleware.ts   cookie-presence gate
+  instrumentation.ts  boots the reminder runner loops (see "Telegram reminders")
 ```
 
 ### Features
@@ -49,6 +50,8 @@ src/
   (`?from=&to=`).
 - **Calendar** — a hand-rolled month grid at `/calendario` placing every dated
   record (`?month=YYYY-MM`, `?day=YYYY-MM-DD`).
+- **Telegram reminders** — optional per-creator reminders for dated records
+  with a time; link at `/telegram`, see "Telegram reminders" below.
 
 ### Roles and visibility
 
@@ -84,6 +87,10 @@ Copy `.env.example` to `.env.local` and fill in the values. These are
 | `APPWRITE_ADMINS_TEAM_ID` | Team ID whose members are admins |
 | `FORCE_NODE_FETCH` | Set to `1` on Node 26 (see above) |
 
+The six **optional** reminder keys are documented, with their own table, under
+[Telegram reminders](#telegram-reminders) — absence disables the feature and the
+app still boots.
+
 ## Provisioning
 
 The app expects an Appwrite database with a `tasks` collection, an
@@ -114,6 +121,106 @@ Manual equivalent, if you prefer the console:
 7. **Team `admins`** — add every admin user as a member.
 
 Record the resulting IDs in `.env.local`.
+
+## Telegram reminders
+
+Optional, per-creator reminders: a dated record **with a time** sends one
+Telegram message to its creator when it comes due. The feature is fully
+off by default — with no Telegram configuration the app runs exactly as
+before (spec `reminder-delivery` → "Disabled or unconfigured reminders").
+
+### Runner behavior
+
+`src/instrumentation.ts` boots at server start (Next 15 `nodejs` runtime) and
+starts **two loops**, owned by a single process-wide record so a double boot
+or dev HMR never starts a second pair:
+
+- **Bot loop** — long-polls `getUpdates` and answers `/start <link-token>` by
+  self-POSTing `{ token, chatId }` to `POST /api/telegram/link` with the
+  shared-secret header, then confirms in the chat. Only terminal outcomes
+  advance the offset; transient failures (network, 5xx, 429) keep it so
+  Telegram re-delivers.
+- **Scheduler loop** — every `REMINDERS_POLL_SECONDS` (default 60): loads due,
+  unnotified records for the last 24 h from Appwrite, intersects them with
+  active linked subscriptions, and sends **one message per record, then marks
+  `notified`** (send-then-mark: a crash in between can duplicate once, never
+  lose). Transient send failures are retried on the next poll while still
+  inside the window; a `403` (bot blocked) deactivates that user's
+  subscription so no further sends target them.
+
+Both loops catch their own errors, back off `min(interval · 2^n, 5 min)` and
+reset on the next success — a failing dependency can never crash the server.
+`SIGTERM` stops both loops and aborts the in-flight long poll so the
+container exits cleanly.
+
+### ⚠️ Single replica — hard constraint
+
+The scheduler has **no leader election**: two replicas would both poll and
+both send (duplicate messages). The Easypanel service `grupo-ecotech-agenda`
+must run **exactly one replica** — do not enable scaling while the runner
+code is present, regardless of `REMINDERS_ENABLED`.
+
+### Linking
+
+At `/telegram` (or the **Telegram** entry in the list header, which always
+shows the current status):
+
+1. **Generar enlace** mints a single-use token (43 chars, 10-minute TTL) and
+   shows a plain `https://t.me/<bot>?start=<token>` anchor — re-minting kills
+   the previous link.
+2. Opening it in Telegram makes the bot store the chat binding and confirm:
+   "Vinculación correcta…".
+3. **Desvincular** clears the binding (`chatId`/`token` reset, `active:false`)
+   and reminders stop for that user.
+
+Chat ids are never displayed in the UI and never logged. States: not
+configured / unlinked / linked / blocked (blocked = the user blocked the bot;
+recovery is manual re-link from the same page).
+
+### Environment
+
+| Variable | Purpose |
+| --- | --- |
+| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather — together with the next two, gates the feature |
+| `TELEGRAM_BOT_USERNAME` | Bot username, `@`-less (used to build deep links) |
+| `TELEGRAM_LINK_SECRET` | Shared secret for the callback header — generate with `openssl rand -hex 32` |
+| `REMINDERS_ENABLED` | Set to `false` to stop both loops even when the three keys exist |
+| `REMINDERS_POLL_SECONDS` | Poll interval in seconds (default `60`, invalid falls back) |
+| `TELEGRAM_CALLBACK_ORIGIN` | Origin the bot self-POSTs to (default `http://127.0.0.1:3000`) |
+
+All six are **server-only**; never prefix them `NEXT_PUBLIC_*`. The loader
+never throws: missing keys simply report disabled.
+
+**Dev/prod anti-pattern:** never run local dev and production against the
+**same bot token** — `getUpdates` is exclusive, so your dev process steals
+updates from production (and vice versa). Use a separate dev bot, or leave
+the keys unset locally so the feature stays disabled there.
+
+### Easypanel steps (production)
+
+1. Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` and `TELEGRAM_LINK_SECRET`
+   in the service environment **first** (the app boots without them; the
+   feature activates as soon as they exist).
+2. Set `TELEGRAM_CALLBACK_ORIGIN` to the public origin (`https://<domain>`).
+3. Confirm **one replica** for `grupo-ecotech-agenda`.
+4. Deploy, then link from `/telegram`.
+
+### Rollback
+
+- **Feature flag:** set `REMINDERS_ENABLED=false` and restart — both loops
+  stop, the linking page shows the not-configured copy, the rest of the app is
+  untouched.
+- **Full revert:** the reminders PRs stack onto `main`, so revert them in
+  reverse order.
+
+### Scheduled-function fallback
+
+The token-exchange endpoint (`POST /api/telegram/link`) is a plain HTTP route
+with a shared-secret header precisely so it stays callable from outside the
+in-process loops: if long-polling/instrumentation ever becomes unavailable,
+the same `runReminderPoll` cycle can be triggered by an Appwrite scheduled
+function (or any cron) while linking keeps working unchanged. The in-process
+runner is the supported path today; this is the documented escape hatch.
 
 ## Development
 
