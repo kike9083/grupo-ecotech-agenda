@@ -180,6 +180,8 @@ Probed live against the deployed app:
    60 s poll the document read **`notified=True`**. Since marking happens only
    after the channel reports `delivered`, Telegram answered 200 ⇒ exactly one
    `Recordatorio:` message was sent to the linked chat.
+   **Operator confirmation (human, same run):** exactly ONE `Recordatorio:`
+   message arrived in the linked chat — no duplicate was observed.
 6. **Cleanup** — the probe was the only object created; audit printed all three
    documents first, then `DELETE` by its exact id `6ac412a20008ab1e1f26` →
    **204**. Post-state `total=2`: `6ac32aa8000b0ae3dd09` *prueba 1* and
@@ -193,7 +195,7 @@ Probed live against the deployed app:
 | push → auto-deploy (single replica) | live (`list_containers` → 1 container) |
 | mint → deep link → `/start` → "Vinculado" | live |
 | expired / reused token rejected | unit (`telegram-link.test.ts`) — re-mint killing the prior token observed live |
-| dated+timed record fires exactly one message | live (`notified=True` inside one poll) |
+| dated+timed record fires exactly one message | live (`notified=True` inside one poll) **+ operator saw exactly 1 message** |
 | `notified=true` | live |
 | restart → no duplicate | unit (`reminders.test.ts`, persisted `notified:true` ⇒ 0 sends). Not replayed: restarting production would only re-read the same external `notified` state |
 | unlink → no sends | unit (`telegram-link.test.ts`, `appwrite/telegram.test.ts`). Not replayed: the subscription was left linked deliberately so the operator can keep exercising the flow from `/telegram` |
