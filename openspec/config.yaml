@@ -7,7 +7,7 @@ context: |
   Data: existing DBs crm-ge (6a0f615d0028be264f5b) and ecotech_sitio_web MUST NOT be reused; new database `agenda` for this change.
   Deploy: Easypanel project `varios`, service `grupo-ecotech-agenda`, repo kike9083/grupo-ecotech-agenda (main), nixpacks, autoDeploy.
   Style: English artifacts; conventional commits; no AI attribution in commits.
-  Testing: to be established (Vitest planned, not installed); strict_tdd disabled until a runner exists.
+  Testing: Vitest installed and enforced (strict TDD: RED test first, then implement).
   Review budget: 400 changed lines per PR; delivery strategy auto-forecast.
 
 sdd:
@@ -16,30 +16,30 @@ sdd:
   delivery_strategy: auto-forecast
   review_budget_lines: 400
 
-strict_tdd: false # no test runner in repo yet; re-evaluate once Vitest is installed
+strict_tdd: true # Vitest installed; RED test first, then implementation
 
 testing:
-  status: to-be-established
+  status: established
   runner: vitest
-  runner_installed: false
-  command: npx vitest run # effective only after the runner is installed
+  runner_installed: true
+  command: npx vitest run
   layers:
-    unit: planned-vitest
+    unit: vitest
     integration: none-detected
-    e2e: none-detected
+    e2e: http-smoke (manual, PowerShell + curl against deployed build)
   coverage:
     available: false
     command: npx vitest run --coverage # requires @vitest/coverage-v8
   quality_tools:
     linter:
       available: false
-      command: npx eslint . # planned
+      command: npx eslint . # not configured in this repo
     type_checker:
-      available: false
-      command: npx tsc --noEmit # planned
+      available: true
+      command: npx tsc --noEmit
     formatter:
       available: false
-      command: npx prettier --check . # planned
+      command: npx prettier . --check # not configured
 
 rules:
   proposal:
@@ -60,11 +60,15 @@ rules:
   apply:
     - Follow existing code patterns
     - Conventional commits only; no AI attribution in commits
-    tdd: false
-    test_command: ""
+    tdd: true
+    test_command: npx vitest run
+    gate_commands:
+      - npx tsc --noEmit
+      - npx vitest run
+      - npm run build
   verify:
-    test_command: ""
-    build_command: ""
+    test_command: npx vitest run
+    build_command: npm run build
     coverage_threshold: 0
   archive:
     - Warn before merging destructive deltas
