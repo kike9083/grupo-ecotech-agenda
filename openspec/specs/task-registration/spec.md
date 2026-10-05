@@ -37,3 +37,19 @@ Status MUST go `open` → `in_progress` → `done`, or `cancelled` from any non-
 #### Scenario: Admin overrides
 
 - GIVEN another user's record WHEN an admin sets `cancelled` THEN it saves
+
+### Requirement: Task attachments
+
+A task MAY carry attachments (images, voice notes) keyed by its record id; attachment behavior is defined by the `attachments` capability. Attachments are added from the record's shared attachment form (the task creation form itself has no file input). Existing task creation and validation MUST remain unchanged when no attachment is present.
+
+#### Scenario: Task with attachment
+
+- GIVEN an authenticated user with a stored task
+- WHEN they attach a valid image to it through the record's attachment form
+- THEN the task remains stored unchanged and the image is listed among its attachments
+
+#### Scenario: Task without attachment
+
+- GIVEN an authenticated user
+- WHEN a valid task is saved with no files
+- THEN it is stored exactly as before
