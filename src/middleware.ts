@@ -37,8 +37,20 @@ export function middleware(request: NextRequest): NextResponse {
   return NextResponse.next();
 }
 
+/**
+ * Turbopack can only statically parse a LITERAL `matcher` (an imported
+ * constant or spread breaks the build with "Invalid segment configuration"),
+ * so the pattern is inlined here. `src/lib/middleware-matcher.ts` holds the
+ * same string as `MIDDLEWARE_MATCHER` plus the testable `matchesMiddleware`
+ * seam, and `middleware-matcher.test.ts` asserts the two never drift.
+ *
+ * `/api/attachments/upload` is excluded so Next.js does not buffer its body
+ * at the 10 MB middleware cap (verify F1); every other route keeps the
+ * presence gate, and the upload route authenticates itself via
+ * `getCurrentUser()` (401 when the session is missing).
+ */
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/attachments/upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
