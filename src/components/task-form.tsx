@@ -35,25 +35,22 @@ export function TaskForm({ defaultDate = '' }: { defaultDate?: string }) {
   const values = state.values;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="card flex flex-col gap-4 p-5">
       {state.formError !== null ? (
-        <p
-          role="alert"
-          className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
-        >
+        <p role="alert" className="banner banner-danger">
           {state.formError}
         </p>
       ) : null}
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="type" className="text-sm font-medium">
+        <label htmlFor="type" className="field-label">
           Tipo
         </label>
         <select
           id="type"
           name="type"
           defaultValue={values.type ?? 'task'}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="field"
         >
           {TASK_TYPES.map((option) => (
             <option key={option} value={option}>
@@ -65,7 +62,7 @@ export function TaskForm({ defaultDate = '' }: { defaultDate?: string }) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="title" className="text-sm font-medium">
+        <label htmlFor="title" className="field-label">
           Título
         </label>
         <input
@@ -75,13 +72,13 @@ export function TaskForm({ defaultDate = '' }: { defaultDate?: string }) {
           maxLength={TITLE_MAX_LENGTH}
           defaultValue={values.title}
           aria-invalid={state.fieldErrors.title !== undefined}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="field"
         />
         <FieldError message={state.fieldErrors.title} />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="description" className="text-sm font-medium">
+        <label htmlFor="description" className="field-label">
           Descripción
         </label>
         <textarea
@@ -91,14 +88,14 @@ export function TaskForm({ defaultDate = '' }: { defaultDate?: string }) {
           maxLength={DESCRIPTION_MAX_LENGTH}
           defaultValue={values.description}
           aria-invalid={state.fieldErrors.description !== undefined}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="field"
         />
         <FieldError message={state.fieldErrors.description} />
       </div>
 
       <div className="flex gap-4">
         <div className="flex flex-1 flex-col gap-1">
-          <label htmlFor="date" className="text-sm font-medium">
+          <label htmlFor="date" className="field-label">
             Fecha
           </label>
           <input
@@ -107,13 +104,13 @@ export function TaskForm({ defaultDate = '' }: { defaultDate?: string }) {
             type="date"
             defaultValue={values.date ?? defaultDate}
             aria-invalid={state.fieldErrors.date !== undefined}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="field"
           />
           <FieldError message={state.fieldErrors.date} />
         </div>
 
         <div className="flex flex-1 flex-col gap-1">
-          <label htmlFor="time" className="text-sm font-medium">
+          <label htmlFor="time" className="field-label">
             Hora
           </label>
           <input
@@ -122,7 +119,7 @@ export function TaskForm({ defaultDate = '' }: { defaultDate?: string }) {
             type="time"
             defaultValue={values.time}
             aria-invalid={state.fieldErrors.time !== undefined}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="field"
           />
           <FieldError message={state.fieldErrors.time} />
         </div>
@@ -132,13 +129,13 @@ export function TaskForm({ defaultDate = '' }: { defaultDate?: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="btn btn-primary disabled:opacity-60"
         >
           {pending ? 'Guardando…' : 'Crear tarea'}
         </button>
         <a
           href="/"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="btn btn-ghost"
         >
           Cancelar
         </a>

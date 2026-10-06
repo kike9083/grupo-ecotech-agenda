@@ -44,7 +44,7 @@ export function NoteForm() {
     editorProps: {
       attributes: {
         class:
-          'min-h-32 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:outline-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5',
+          'field min-h-32 focus:outline-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5',
       },
     },
     onUpdate: ({ editor: instance }) => {
@@ -53,18 +53,15 @@ export function NoteForm() {
   });
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="card flex flex-col gap-4 p-5">
       {state.formError !== null ? (
-        <p
-          role="alert"
-          className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
-        >
+        <p role="alert" className="banner banner-danger">
           {state.formError}
         </p>
       ) : null}
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="title" className="text-sm font-medium">
+        <label htmlFor="title" className="field-label">
           Título (opcional)
         </label>
         <input
@@ -74,7 +71,7 @@ export function NoteForm() {
           maxLength={NOTE_TITLE_MAX_LENGTH}
           defaultValue={values.title}
           aria-invalid={state.fieldErrors.title !== undefined}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="field"
         />
         <FieldError message={state.fieldErrors.title} />
       </div>
@@ -86,7 +83,7 @@ export function NoteForm() {
             type="button"
             disabled={editor === null}
             onClick={() => editor?.chain().focus().toggleBold().run()}
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium disabled:opacity-50"
+            className="btn btn-secondary btn-sm disabled:opacity-50"
           >
             Negrita
           </button>
@@ -94,7 +91,7 @@ export function NoteForm() {
             type="button"
             disabled={editor === null}
             onClick={() => editor?.chain().focus().toggleItalic().run()}
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium disabled:opacity-50"
+            className="btn btn-secondary btn-sm disabled:opacity-50"
           >
             Cursiva
           </button>
@@ -104,7 +101,7 @@ export function NoteForm() {
             onClick={() =>
               editor?.chain().focus().toggleHeading({ level: 2 }).run()
             }
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium disabled:opacity-50"
+            className="btn btn-secondary btn-sm disabled:opacity-50"
           >
             Título
           </button>
@@ -112,7 +109,7 @@ export function NoteForm() {
             type="button"
             disabled={editor === null}
             onClick={() => editor?.chain().focus().toggleBulletList().run()}
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium disabled:opacity-50"
+            className="btn btn-secondary btn-sm disabled:opacity-50"
           >
             Lista
           </button>
@@ -122,7 +119,7 @@ export function NoteForm() {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="date" className="text-sm font-medium">
+        <label htmlFor="date" className="field-label">
           Fecha (opcional)
         </label>
         <input
@@ -131,7 +128,7 @@ export function NoteForm() {
           type="date"
           defaultValue={values.date}
           aria-invalid={state.fieldErrors.date !== undefined}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="field"
         />
         <FieldError message={state.fieldErrors.date} />
       </div>
@@ -140,13 +137,13 @@ export function NoteForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="btn btn-primary disabled:opacity-60"
         >
           {pending ? 'Guardando…' : 'Guardar nota'}
         </button>
         <a
           href="/"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="btn btn-ghost"
         >
           Cancelar
         </a>

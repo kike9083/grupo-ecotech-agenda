@@ -12,8 +12,8 @@ export function LinkStatus({ state }: { state: TelegramLinkState }) {
     <span
       className={
         linked
-          ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800'
-          : 'rounded-full border border-neutral-300 bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600'
+          ? 'badge badge-accent'
+          : 'badge badge-neutral'
       }
     >
       {telegramBadgeLabel(state)}

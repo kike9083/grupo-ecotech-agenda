@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Databases } from 'node-appwrite';
 import { logout } from '@/actions/auth';
 import { AdminTaskList } from '@/components/admin-task-list';
+import { PageShell } from '@/components/page-shell';
 import { resolveAdminAccess } from '@/lib/admin-gate';
 import { loadEnv } from '@/lib/env';
 import { createSessionClient } from '@/lib/appwrite/clients';
@@ -80,45 +81,40 @@ export default async function AdminPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-12">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Administración</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/"
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-          >
+    <PageShell
+      title="Administración"
+      subtitle={user === null ? 'Grupo Ecotech' : user.email}
+      actions={
+        <>
+          <Link href="/" className="btn btn-secondary">
             Volver
           </Link>
           <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-            >
+            <button type="submit" className="btn btn-ghost">
               Cerrar sesión
             </button>
           </form>
-        </div>
-      </header>
-
-      <p className="text-sm text-neutral-600">
+        </>
+      }
+    >
+      <p className="meta">
         Todas las tareas del equipo, con la persona responsable de cada una.
       </p>
 
       <form
         method="get"
         action="/admin"
-        className="flex flex-wrap items-end gap-2"
+        className="card flex flex-wrap items-end gap-3 p-4"
       >
         <div className="flex flex-col gap-1">
-          <label htmlFor="status" className="text-sm font-medium">
+          <label htmlFor="status" className="field-label">
             Estado
           </label>
           <select
             id="status"
             name="status"
             defaultValue={query.status ?? ''}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="field"
           >
             <option value="">Todos</option>
             {TASK_STATUSES.map((option) => (
@@ -130,14 +126,14 @@ export default async function AdminPage({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="type" className="text-sm font-medium">
+          <label htmlFor="type" className="field-label">
             Tipo
           </label>
           <select
             id="type"
             name="type"
             defaultValue={query.type ?? ''}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="field"
           >
             <option value="">Todos</option>
             {TASK_TYPES.map((option) => (
@@ -149,7 +145,7 @@ export default async function AdminPage({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <label htmlFor="creator" className="text-sm font-medium">
+          <label htmlFor="creator" className="field-label">
             Creador
           </label>
           <input
@@ -158,27 +154,24 @@ export default async function AdminPage({
             type="text"
             defaultValue={query.creator}
             placeholder="correo@ejemplo.com"
-            className="min-w-0 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="field min-w-0"
           />
         </div>
 
         <button
           type="submit"
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white"
+          className="btn btn-primary"
         >
           Aplicar
         </button>
         {query.filtered ? (
-          <a
-            href="/admin"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-          >
+          <a href="/admin" className="btn btn-ghost">
             Limpiar
           </a>
         ) : null}
       </form>
 
       <AdminTaskList page={page} query={query} />
-    </main>
+    </PageShell>
   );
 }

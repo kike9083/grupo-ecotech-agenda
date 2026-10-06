@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { Databases } from 'node-appwrite';
 import { logout } from '@/actions/auth';
 import { MonthGrid } from '@/components/month-grid';
+import { PageShell } from '@/components/page-shell';
 import { createSessionClient } from '@/lib/appwrite/clients';
 import { isDomainError } from '@/lib/appwrite/errors';
 import { getCurrentUser, getSessionSecret, isAdmin } from '@/lib/appwrite/session';
@@ -111,35 +112,25 @@ export default async function CalendarioPage({
   const admin = await isAdmin();
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-4 py-12">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Calendario</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/"
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-          >
+    <PageShell
+      title="Calendario"
+      subtitle={`Sesión iniciada como ${user.email}${admin ? ' (administrador)' : ''}`}
+      actions={
+        <>
+          <Link href="/" className="btn btn-secondary">
             {CALENDAR_BACK_LABEL}
           </Link>
           <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-            >
+            <button type="submit" className="btn btn-ghost">
               Cerrar sesión
             </button>
           </form>
-        </div>
-      </header>
-
-      <p className="text-sm text-neutral-600">
-        Sesión iniciada como <span className="font-medium">{user.email}</span>
-        {admin ? ' (administrador)' : ''}
-      </p>
-
+        </>
+      }
+    >
       <Suspense
         fallback={
-          <p role="status" className="text-sm text-neutral-500">
+          <p role="status" className="meta">
             {CALENDAR_LOADING_LABEL}
           </p>
         }
@@ -153,6 +144,6 @@ export default async function CalendarioPage({
           selectedDay={selectedDay}
         />
       </Suspense>
-    </main>
+    </PageShell>
   );
 }

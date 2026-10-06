@@ -1,26 +1,286 @@
 @import "tailwindcss";
 
+/*
+ * Ecotech Modern — tokens ported from the Google Stitch design system
+ * "Ecotech Operational Harmony" (assets/3e4cd8ff80e4412abd6db85d48a3ff97).
+ * Source of truth for every visual decision in this app; component classes
+ * below are the single place where button/card/field/badge styling lives.
+ */
+@theme {
+  /* Canvas & surfaces */
+  --color-canvas: #f7f8f7;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f1f5f9;
+  --color-hairline: #e2e8f0;
+  --color-hairline-soft: rgb(15 23 42 / 0.06);
+
+  /* Brand (accent is never used for large fills) */
+  --color-accent: #059669;
+  --color-accent-hover: #047857;
+  --color-accent-soft: #ecfdf5;
+
+  /* Text hierarchy */
+  --color-ink: #0f172a;
+  --color-ink-muted: #475569;
+  --color-ink-subtle: #94a3b8;
+
+  /* Task states */
+  --color-state-done: #059669;
+  --color-state-done-bg: #d1fae5;
+  --color-state-pending: #d97706;
+  --color-state-pending-bg: #fef3c7;
+  --color-state-cancelled: #64748b;
+  --color-state-cancelled-bg: #f1f5f9;
+
+  /* Feedback */
+  --color-danger: #ba1a1a;
+  --color-danger-bg: #ffdad6;
+
+  /* Type */
+  --font-display: var(--font-manrope), "Manrope", system-ui, sans-serif;
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+
+  /* Shape */
+  --radius-card: 0.75rem;
+  --radius-control: 0.625rem;
+
+  /* Depth — light by design, never a hard black shadow */
+  --shadow-card: 0 4px 20px -2px rgb(0 0 0 / 0.05);
+  --shadow-elevated: 0 10px 25px -3px rgb(0 0 0 / 0.07),
+    0 4px 6px -4px rgb(0 0 0 / 0.03);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+@layer components {
+  /* ---- Buttons ---------------------------------------------------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-control);
+    padding: 0.5rem 0.875rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease,
+      transform 0.15s ease;
+  }
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(5 150 105 / 0.35);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--color-accent);
+    color: #ffffff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-accent-hover);
+    transform: translateY(-0.5px);
+  }
+
+  .btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-ink-muted);
+    border: 1px solid var(--color-hairline);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: #f8fafc;
+    color: var(--color-ink);
+    border-color: #cbd5e1;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-accent);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-accent-soft);
+  }
+
+  .btn-sm {
+    padding: 0.3125rem 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+  }
+
+  /* ---- Surfaces --------------------------------------------------- */
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-hairline-soft);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .card-hover {
+    transition:
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-elevated);
+    border-color: rgb(15 23 42 / 0.1);
+  }
+
+  /* Frosted sticky bar — header only, never on scrollable content. */
+  .frosted {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgb(255 255 255 / 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgb(226 232 240 / 0.8);
+  }
+
+  /* ---- Form controls ---------------------------------------------- */
+  .field {
+    width: 100%;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-hairline);
+    background: var(--color-surface);
+    padding: 0.625rem 0.875rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--color-ink);
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .field::placeholder {
+    color: var(--color-ink-subtle);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgb(5 150 105 / 0.12);
+  }
+
+  .field-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    color: var(--color-ink-muted);
+  }
+
+  /* ---- Badges (pills only — statuses are never rectangular) -------- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    padding: 0.125rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+  .badge-done {
+    color: var(--color-state-done);
+    background: var(--color-state-done-bg);
+  }
+  .badge-pending {
+    color: var(--color-state-pending);
+    background: var(--color-state-pending-bg);
+  }
+  .badge-cancelled {
+    color: var(--color-state-cancelled);
+    background: var(--color-state-cancelled-bg);
+  }
+  .badge-accent {
+    color: var(--color-accent-hover);
+    background: var(--color-accent-soft);
+  }
+  .badge-neutral {
+    color: var(--color-ink-muted);
+    background: var(--color-surface-sunken);
+  }
+
+  /* ---- Feedback banners -------------------------------------------- */
+  .banner {
+    border-radius: var(--radius-card);
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.4rem;
+  }
+  .banner-success {
+    background: var(--color-accent-soft);
+    color: var(--color-accent-hover);
+    border: 1px solid #a7f3d0;
+  }
+  .banner-danger {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border: 1px solid #fca5a5;
+  }
+
+  /* ---- Misc -------------------------------------------------------- */
+  .page-shell {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .page-shell {
+      padding-inline: 2rem;
+    }
+  }
+
+  .meta {
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+    color: var(--color-ink-muted);
+  }
+
+  .link-quiet {
+    color: var(--color-ink-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+  .link-quiet:hover {
+    color: var(--color-accent);
+  }
 }

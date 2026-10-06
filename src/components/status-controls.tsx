@@ -48,7 +48,7 @@ export function StatusControls({ task }: StatusControlsProps) {
           name="to"
           value={to}
           disabled={pending}
-          className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium disabled:opacity-60"
+          className="btn btn-secondary btn-sm disabled:opacity-60"
         >
           {statusActionLabel(to)}
         </button>

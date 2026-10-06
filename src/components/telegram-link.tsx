@@ -25,14 +25,14 @@ export function TelegramLink({ state }: { state: TelegramLinkState }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-neutral-700">{copy.body}</p>
+      <p className="text-sm text-ink">{copy.body}</p>
 
       {mintState?.deepLink != null ? (
         <a
           href={mintState.deepLink}
           target="_blank"
           rel="noreferrer"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-900"
+          className="btn btn-secondary"
         >
           Abrir en Telegram
         </a>
@@ -43,12 +43,12 @@ export function TelegramLink({ state }: { state: TelegramLinkState }) {
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="btn btn-primary disabled:opacity-60"
           >
             {state === 'linked' ? 'Actualizar enlace' : 'Generar enlace'}
           </button>
           {pending ? (
-            <span className="text-xs text-neutral-500">Generando…</span>
+            <span className="meta">Generando…</span>
           ) : null}
         </form>
       ) : null}
@@ -57,7 +57,7 @@ export function TelegramLink({ state }: { state: TelegramLinkState }) {
         <form action={unlinkTelegram} className="flex items-center gap-3">
           <button
             type="submit"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700"
+            className="btn btn-secondary"
           >
             Desvincular
           </button>

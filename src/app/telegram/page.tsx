@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Databases } from 'node-appwrite';
 import { LinkStatus } from '@/components/link-status';
+import { PageShell } from '@/components/page-shell';
 import { TelegramLink } from '@/components/telegram-link';
 import { createSessionClient } from '@/lib/appwrite/clients';
 import { getSessionSecret, getCurrentUser } from '@/lib/appwrite/session';
@@ -60,23 +61,23 @@ export default async function TelegramPage() {
   const copy = telegramPageCopy(state);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-12">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Telegram</h1>
-        <Link
-          href="/"
-          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-        >
+    <PageShell
+      title="Telegram"
+      subtitle="Recordatorios por mensaje directo"
+      actions={
+        <Link href="/" className="btn btn-secondary">
           Agenda
         </Link>
-      </header>
+      }
+    >
+      <section className="card flex flex-col gap-4 p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-semibold">{copy.title}</h2>
+          <LinkStatus state={state} />
+        </div>
 
-      <div className="flex items-center gap-3">
-        <h2 className="text-lg font-medium">{copy.title}</h2>
-        <LinkStatus state={state} />
-      </div>
-
-      <TelegramLink state={state} />
-    </main>
+        <TelegramLink state={state} />
+      </section>
+    </PageShell>
   );
 }

@@ -9,7 +9,7 @@
  */
 export function LoadingState() {
   return (
-    <p role="status" className="text-sm text-neutral-500">
+    <p role="status" className="meta">
       Cargando…
     </p>
   );

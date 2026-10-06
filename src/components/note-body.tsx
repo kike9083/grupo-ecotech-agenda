@@ -10,7 +10,7 @@ import { NOTE_EMPTY_MESSAGE, resolveNoteBodyState } from '@/lib/note-ui-states';
  */
 export function NoteBody({ html }: { html: string }) {
   if (resolveNoteBodyState(html) === 'empty') {
-    return <p className="text-sm text-neutral-500">{NOTE_EMPTY_MESSAGE}</p>;
+    return <p className="meta">{NOTE_EMPTY_MESSAGE}</p>;
   }
 
   return (

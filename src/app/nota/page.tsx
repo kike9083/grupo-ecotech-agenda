@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { NoteForm } from '@/components/note-form';
+import { PageShell } from '@/components/page-shell';
 import { getSessionSecret, getCurrentUser } from '@/lib/appwrite/session';
 
 /**
@@ -21,22 +22,16 @@ export default async function NuevaNotaPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-12">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Nueva nota</h1>
-        <Link
-          href="/"
-          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-        >
+    <PageShell
+      title="Nueva nota"
+      subtitle={`Sesión iniciada como ${user.email}`}
+      actions={
+        <Link href="/" className="btn btn-ghost">
           Volver
         </Link>
-      </header>
-
-      <p className="text-sm text-neutral-600">
-        Sesión iniciada como <span className="font-medium">{user.email}</span>
-      </p>
-
+      }
+    >
       <NoteForm />
-    </main>
+    </PageShell>
   );
 }

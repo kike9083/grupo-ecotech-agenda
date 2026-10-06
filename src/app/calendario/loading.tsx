@@ -9,7 +9,7 @@ import { CALENDAR_LOADING_LABEL } from '@/lib/calendar';
 export default function CalendarioLoading() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-4 py-12">
-      <p role="status" className="text-sm text-neutral-500">
+      <p role="status" className="meta">
         {CALENDAR_LOADING_LABEL}
       </p>
     </main>

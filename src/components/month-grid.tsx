@@ -53,8 +53,11 @@ export function MonthGrid({
 
   if (loadFailed) {
     return (
-      <section className="flex flex-col items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3">
-        <p role="alert" className="text-sm text-red-700">
+      <section
+        role="alert"
+        className="banner banner-danger flex flex-col items-start gap-2"
+      >
+        <p className="text-sm text-red-700">
           {errorMessage ?? CALENDAR_LOAD_ERROR_MESSAGE}
         </p>
         <Link
@@ -74,7 +77,7 @@ export function MonthGrid({
           href={buildCalendarHref({
             month: `${previous.year}-${String(previous.month).padStart(2, '0')}`,
           })}
-          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+          className="btn btn-secondary"
         >
           {CALENDAR_PREV_LABEL}
         </Link>
@@ -83,17 +86,17 @@ export function MonthGrid({
           href={buildCalendarHref({
             month: `${next.year}-${String(next.month).padStart(2, '0')}`,
           })}
-          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+          className="btn btn-secondary"
         >
           {CALENDAR_NEXT_LABEL}
         </Link>
       </div>
 
       {resolveCalendarState(datedCount) === 'empty' ? (
-        <p className="text-sm text-neutral-500">{CALENDAR_EMPTY_MESSAGE}</p>
+        <p className="meta">{CALENDAR_EMPTY_MESSAGE}</p>
       ) : null}
 
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-neutral-500">
+      <div className="grid grid-cols-7 gap-1 text-center meta font-medium">
         {WEEKDAY_LABELS.map((label) => (
           <span key={label}>{label}</span>
         ))}

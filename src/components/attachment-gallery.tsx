@@ -26,7 +26,7 @@ export function AttachmentGallery({
         return (
           <li
             key={attachment.$id}
-            className="flex flex-col items-start gap-1 rounded-md border border-neutral-200 p-1"
+            className="flex flex-col items-start gap-1 rounded-lg border border-hairline bg-surface p-1"
           >
             {attachment.kind === 'image' ? (
               <a href={src} target="_blank" rel="noreferrer">

@@ -197,95 +197,108 @@ export default async function HomePage({
   const queryTo = rangeValid ? to : '';
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-12">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Agenda</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/nueva"
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white"
-          >
-            Nueva tarea
-          </Link>
-          <Link
-            href="/nota"
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white"
-          >
-            Nueva nota
-          </Link>
-          <Link
-            href="/calendario"
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-          >
-            Calendario
-          </Link>
-          <Link
-            href={telegram.href}
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-          >
-            {telegram.label}
-          </Link>
-          <LinkStatus state={telegramState} />
-          {admin ? (
-            <Link
-              href="/admin"
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+    <div className="min-h-screen">
+      <header className="frosted">
+        <div className="page-shell flex min-h-16 flex-wrap items-center justify-between gap-3 py-3">
+          <div className="flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="flex size-9 items-center justify-center rounded-xl bg-accent-soft"
             >
-              Administración
+              <svg
+                viewBox="0 0 24 24"
+                className="size-5 text-accent"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+                <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+              </svg>
+            </span>
+            <div className="flex flex-col leading-tight">
+              <h1 className="text-base font-bold">Agenda</h1>
+              <span className="meta">Grupo Ecotech</span>
+            </div>
+          </div>
+
+          <nav className="flex flex-wrap items-center justify-end gap-2">
+            <Link href="/nueva" className="btn btn-primary">
+              Nueva tarea
             </Link>
-          ) : null}
-          <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-            >
-              Cerrar sesión
-            </button>
-          </form>
+            <Link href="/nota" className="btn btn-secondary">
+              Nueva nota
+            </Link>
+            <Link href="/calendario" className="btn btn-secondary">
+              Calendario
+            </Link>
+            <Link href={telegram.href} className="btn btn-secondary">
+              {telegram.label}
+            </Link>
+            <LinkStatus state={telegramState} />
+            {admin ? (
+              <Link href="/admin" className="btn btn-secondary">
+                Administración
+              </Link>
+            ) : null}
+            <form action={logout}>
+              <button type="submit" className="btn btn-ghost">
+                Cerrar sesión
+              </button>
+            </form>
+          </nav>
         </div>
       </header>
 
-      <p className="text-sm text-neutral-600">
-        Sesión iniciada como <span className="font-medium">{user.email}</span>
-        {admin ? ' (administrador)' : ''}
-      </p>
+      <main className="page-shell flex flex-col gap-6 py-8">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h2 className="text-2xl font-bold">Tareas y solicitudes</h2>
+            <p className="meta mt-1">
+              Sesión iniciada como{' '}
+              <span className="font-semibold text-ink">{user.email}</span>
+              {admin ? ' (administrador)' : ''}
+            </p>
+          </div>
+        </div>
 
-      {created ? (
-        <p
-          role="status"
-          className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
-        >
-          Tarea creada correctamente.
-        </p>
-      ) : null}
+        {created ? (
+          <p role="status" className="banner banner-success">
+            Tarea creada correctamente.
+          </p>
+        ) : null}
 
-      {noted ? (
-        <p
-          role="status"
-          className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
-        >
-          Nota creada correctamente.
-        </p>
-      ) : null}
+        {noted ? (
+          <p role="status" className="banner banner-success">
+            Nota creada correctamente.
+          </p>
+        ) : null}
 
-      <SearchForm q={q} from={from} to={to} />
-      {rangeValid ? (
-        <Suspense fallback={<LoadingState />}>
-          <HomeTasksSection
-            user={user}
-            secret={secret}
-            admin={admin}
-            q={q}
-            from={queryFrom}
-            to={queryTo}
-            cursor={cursor}
-          />
-        </Suspense>
-      ) : (
-        <p className="text-sm text-neutral-500">
-          Corrige el rango de fechas para ver resultados.
-        </p>
-      )}
-    </main>
+        <div className="mx-auto w-full max-w-3xl">
+          <SearchForm q={q} from={from} to={to} />
+          {rangeValid ? (
+            <div className="mt-4">
+              <Suspense fallback={<LoadingState />}>
+                <HomeTasksSection
+                  user={user}
+                  secret={secret}
+                  admin={admin}
+                  q={q}
+                  from={queryFrom}
+                  to={queryTo}
+                  cursor={cursor}
+                />
+              </Suspense>
+            </div>
+          ) : (
+            <p className="banner banner-danger mt-4">
+              Corrige el rango de fechas para ver resultados.
+            </p>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }

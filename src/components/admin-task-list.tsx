@@ -39,8 +39,11 @@ export function AdminTaskList({ page, query }: AdminTaskListProps) {
 
   if (state.kind === 'error') {
     return (
-      <section className="flex flex-col items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3">
-        <p role="alert" className="text-sm text-red-700">
+      <section
+        role="alert"
+        className="banner banner-danger flex flex-col items-start gap-2"
+      >
+        <p className="text-sm text-red-700">
           {LOAD_ERROR_MESSAGE}
         </p>
         <a
@@ -55,7 +58,7 @@ export function AdminTaskList({ page, query }: AdminTaskListProps) {
 
   if (state.kind === 'empty') {
     return (
-      <p className="text-sm text-neutral-500">
+      <p className="meta">
         {adminEmptyMessage({ filtered: query.filtered })}
       </p>
     );
@@ -69,25 +72,25 @@ export function AdminTaskList({ page, query }: AdminTaskListProps) {
         {tasks.map((task) => (
           <li
             key={task.$id}
-            className="flex flex-col gap-2 rounded-md border border-neutral-300 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+            className="card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
           >
             <div className="flex min-w-0 flex-col gap-1">
               <div className="flex items-center gap-2">
-                <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-800">
+                <span className="badge badge-accent">
                   {typeLabel(task.type)}
                 </span>
                 <span className="font-medium">{task.title}</span>
               </div>
-              <span className="text-xs text-neutral-500">
+              <span className="meta">
                 {formatCreatedBy(task.createdByEmail)}
               </span>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
+            <div className="flex shrink-0 items-center gap-2 meta">
               <span className="font-mono">
                 {task.date} {task.time}
               </span>
-              <span className="rounded-full border border-neutral-300 px-2 py-0.5 font-medium">
+              <span className="badge badge-neutral">
                 {statusLabel(task.status)}
               </span>
             </div>
@@ -108,7 +111,7 @@ export function AdminTaskList({ page, query }: AdminTaskListProps) {
           <a
             href={linkTo(nextCursor)}
             rel="next"
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium"
+            className="btn btn-secondary"
           >
             {NEXT_PAGE_LABEL}
           </a>

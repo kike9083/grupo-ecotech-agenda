@@ -54,13 +54,14 @@ export function TaskList({
 
   if (state.kind === 'error') {
     return (
-      <section className="flex flex-col items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3">
-        <p role="alert" className="text-sm text-red-700">
-          {LOAD_ERROR_MESSAGE}
-        </p>
+      <section
+        role="alert"
+        className="flex flex-col items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+      >
+        <p className="text-sm text-red-700">{LOAD_ERROR_MESSAGE}</p>
         <a
           href={buildListHref({ cursor, q, from, to })}
-          className="text-sm font-medium text-red-800 underline"
+          className="text-sm font-semibold text-red-800 underline"
         >
           {RETRY_LABEL}
         </a>
@@ -69,14 +70,31 @@ export function TaskList({
   }
 
   if (state.kind === 'empty') {
-    return <p className="text-sm text-neutral-500">{emptyMessage({ searching })}</p>;
+    return (
+      <div className="card flex flex-col items-center gap-2 px-6 py-12 text-center">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="size-8 text-ink-subtle"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
+        <p className="text-sm text-ink-muted">{emptyMessage({ searching })}</p>
+      </div>
+    );
   }
 
   const { tasks, nextCursor } = state.page;
 
   return (
     <div className="flex flex-col gap-3">
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-3">
         {tasks.map((task) => {
           const isNote = task.type === 'note';
           const snippet = isNote
@@ -86,33 +104,42 @@ export function TaskList({
           return (
             <li
               key={task.$id}
-              className="flex flex-col gap-2 rounded-md border border-neutral-300 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+              className="card card-hover flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4"
             >
-              <div className="flex min-w-0 flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-800">
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="badge badge-accent">
                     {typeLabel(task.type)}
                   </span>
-                  <span className="font-medium">
+                  <span className="text-[0.975rem] font-semibold leading-snug text-ink">
                     {isNote ? noteHeading(task.title, snippet) : task.title}
                   </span>
                 </div>
                 {isNote ? <NoteBody html={task.bodyHtml ?? ''} /> : null}
-                <span className="text-xs text-neutral-500">
-                  {formatCreatedBy(task.createdByEmail)}
-                </span>
+                <span className="meta">{formatCreatedBy(task.createdByEmail)}</span>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-ink-muted">
                 {isNote ? (
                   <span>{formatNotedAt(task.$createdAt)}</span>
                 ) : (
                   <>
-                    <span className="font-mono">
+                    <span className="font-mono text-ink-muted">
                       {task.date} {task.time}
                     </span>
-                    <span>{formatCreatedAt(task.$createdAt)}</span>
-                    <span className="rounded-full border border-neutral-300 px-2 py-0.5 font-medium">
+                    <span className="text-ink-subtle">
+                      {formatCreatedAt(task.$createdAt)}
+                    </span>
+                    <span
+                      className={
+                        'badge ' +
+                        (task.status === 'done'
+                          ? 'badge-done'
+                          : task.status === 'cancelled'
+                            ? 'badge-cancelled'
+                            : 'badge-pending')
+                      }
+                    >
                       {statusLabel(task.status)}
                     </span>
                   </>
@@ -129,7 +156,7 @@ export function TaskList({
                 />
               )}
 
-              <div className="flex w-full flex-col gap-2 border-t border-neutral-200 pt-2">
+              <div className="flex w-full flex-col gap-2 border-t border-hairline pt-3">
                 <AttachmentGallery
                   attachments={attachmentsByRecord[task.$id] ?? []}
                 />
@@ -141,11 +168,11 @@ export function TaskList({
       </ul>
 
       {nextCursor !== null ? (
-        <div className="flex justify-center">
+        <div className="flex justify-center pt-1">
           <a
             href={buildListHref({ cursor: nextCursor, q, from, to })}
             rel="next"
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium"
+            className="btn btn-secondary"
           >
             {NEXT_PAGE_LABEL}
           </a>
