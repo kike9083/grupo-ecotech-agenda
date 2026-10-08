@@ -69,7 +69,7 @@ export function AttachmentForm({ recordId }: { recordId: string }) {
         id={inputId}
         name="file"
         type="file"
-        accept="image/*,audio/*"
+        accept="image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
         className="text-xs"
       />
       <button

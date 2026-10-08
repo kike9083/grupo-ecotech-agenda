@@ -3,11 +3,13 @@
  * upload"). Pure functions only: the upload route and the attachment flow
  * share this size/type matrix, and nothing here touches Appwrite or Storage.
  *
- * The accepted set mirrors design D3 / the `agenda-attachments` bucket
- * allow-list: images `jpeg/png/webp/heic`, audio `webm/mp3/wav/ogg/m4a/mp4/aac`.
+ * The accepted set mirrors the `agenda-attachments` bucket's
+ * `allowedFileExtensions` allow-list (server-side, so both must move
+ * together): images `jpeg/png/webp/heic`, audio
+ * `webm/mp3/wav/ogg/m4a/mp4/aac`, documents `pdf/doc/docx/xls/xlsx`.
  */
 
-export type AttachmentKind = 'image' | 'audio';
+export type AttachmentKind = 'image' | 'audio' | 'document';
 
 export type AttachmentRejectionReason = 'too-large' | 'unsupported-type';
 
@@ -38,6 +40,14 @@ const AUDIO_MIME = [
   'audio/aac',
 ] as const;
 
+const DOCUMENT_MIME = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+] as const;
+
 /** Extension → canonical MIME, used when the browser reports no/unknown type. */
 const EXTENSION_MIME: Readonly<Record<string, string>> = {
   jpg: 'image/jpeg',
@@ -52,6 +62,11 @@ const EXTENSION_MIME: Readonly<Record<string, string>> = {
   m4a: 'audio/mp4',
   mp4: 'audio/mp4',
   aac: 'audio/aac',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
 /** Spanish copy shown inline by the upload form (spec → "inline Spanish error"). */
@@ -65,7 +80,7 @@ function normalizeMime(type: string): string {
   return type.split(';')[0].trim().toLowerCase();
 }
 
-/** Classifies an accepted MIME as image/audio, or null when unsupported. */
+/** Classifies an accepted MIME as image/audio/document, or null when unsupported. */
 export function kindFromMime(mimeType: string): AttachmentKind | null {
   const mime = normalizeMime(mimeType);
   if ((IMAGE_MIME as readonly string[]).includes(mime)) {
@@ -73,6 +88,9 @@ export function kindFromMime(mimeType: string): AttachmentKind | null {
   }
   if ((AUDIO_MIME as readonly string[]).includes(mime)) {
     return 'audio';
+  }
+  if ((DOCUMENT_MIME as readonly string[]).includes(mime)) {
+    return 'document';
   }
   return null;
 }

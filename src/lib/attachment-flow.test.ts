@@ -136,11 +136,37 @@ describe('performUpload (spec attachments → Attachment upload)', () => {
       recordId: 'task-1',
       ownerId: uploader,
       admin: false,
-      file: { name: 'doc.pdf', type: 'application/pdf', size: 10, bytes: new Uint8Array() },
+      file: { name: 'nota.txt', type: 'text/plain', size: 10, bytes: new Uint8Array() },
     });
 
     expect(result).toEqual({ ok: false, reason: 'unsupported-type' });
     expect(deps.fileCalls).toEqual([]);
+  });
+
+  it('stores a PDF as a document attachment', async () => {
+    const deps = makeUploadHarness();
+
+    const result = await performUpload(deps, {
+      recordId: 'task-1',
+      ownerId: uploader,
+      admin: false,
+      file: {
+        name: 'informe.pdf',
+        type: 'application/pdf',
+        size: 2048,
+        bytes: new Uint8Array([1]),
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(deps.fileCalls).toEqual([
+      { name: 'informe.pdf', type: 'application/pdf', ownerId: recordOwner },
+    ]);
+    expect(deps.documentCalls[0]).toMatchObject({
+      kind: 'document',
+      name: 'informe.pdf',
+      mimeType: 'application/pdf',
+    });
   });
 
   it('rejects an unknown parent record as not-found', async () => {

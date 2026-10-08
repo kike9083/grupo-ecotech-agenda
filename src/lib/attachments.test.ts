@@ -30,6 +30,22 @@ describe('kindFromMime (spec attachments → Attachment upload)', () => {
     expect(kindFromMime('audio/aac')).toBe('audio');
   });
 
+  it('classifies every accepted document MIME', () => {
+    expect(kindFromMime('application/pdf')).toBe('document');
+    expect(kindFromMime('application/msword')).toBe('document');
+    expect(
+      kindFromMime(
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ),
+    ).toBe('document');
+    expect(kindFromMime('application/vnd.ms-excel')).toBe('document');
+    expect(
+      kindFromMime(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ),
+    ).toBe('document');
+  });
+
   it('ignores MIME parameters and case', () => {
     expect(kindFromMime('audio/webm;codecs=opus')).toBe('audio');
     expect(kindFromMime('IMAGE/PNG')).toBe('image');
@@ -37,7 +53,7 @@ describe('kindFromMime (spec attachments → Attachment upload)', () => {
 
   it('rejects anything outside the allow-list', () => {
     expect(kindFromMime('text/plain')).toBeNull();
-    expect(kindFromMime('application/pdf')).toBeNull();
+    expect(kindFromMime('application/zip')).toBeNull();
     expect(kindFromMime('')).toBeNull();
   });
 });
@@ -53,10 +69,22 @@ describe('mimeTypeFor (extension fallback)', () => {
     expect(mimeTypeFor('nota.m4a', '')).toBe('audio/mp4');
     expect(mimeTypeFor('clip.MP3', '')).toBe('audio/mpeg');
     expect(mimeTypeFor('grabacion.wav', '')).toBe('audio/wav');
+    expect(mimeTypeFor('informe.pdf', '')).toBe('application/pdf');
+    expect(mimeTypeFor('acta.DOCX', '')).toBe(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+    expect(mimeTypeFor('presupuesto.xls', '')).toBe('application/vnd.ms-excel');
+  });
+
+  it('falls back to the extension for a generic browser MIME', () => {
+    // Legacy .doc/.xls often arrive as application/octet-stream.
+    expect(mimeTypeFor('acta.doc', 'application/octet-stream')).toBe(
+      'application/msword',
+    );
   });
 
   it('returns null for an unknown extension and no MIME', () => {
-    expect(mimeTypeFor('documento.pdf', '')).toBeNull();
+    expect(mimeTypeFor('nota.txt', '')).toBeNull();
     expect(mimeTypeFor('sin-extension', '')).toBeNull();
   });
 });
@@ -94,9 +122,42 @@ describe('validateAttachment (spec attachments → Oversized or wrong type)', ()
     ).toEqual({ ok: false, reason: 'too-large' });
   });
 
-  it('rejects an unsupported MIME with nothing stored', () => {
+  it('accepts a PDF as a document', () => {
     expect(
       validateAttachment({ name: 'doc.pdf', type: 'application/pdf', size: 10 }),
+    ).toEqual({ ok: true, kind: 'document', mimeType: 'application/pdf' });
+  });
+
+  it('accepts Word and Excel files', () => {
+    expect(
+      validateAttachment({
+        name: 'acta.docx',
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        size: 10,
+      }),
+    ).toEqual({
+      ok: true,
+      kind: 'document',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    expect(
+      validateAttachment({
+        name: 'presupuesto.xlsx',
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        size: 10,
+      }),
+    ).toEqual({
+      ok: true,
+      kind: 'document',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+  });
+
+  it('rejects an unsupported MIME with nothing stored', () => {
+    expect(
+      validateAttachment({ name: 'nota.txt', type: 'text/plain', size: 10 }),
     ).toEqual({ ok: false, reason: 'unsupported-type' });
   });
 

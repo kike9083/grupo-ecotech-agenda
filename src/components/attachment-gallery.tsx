@@ -5,9 +5,10 @@ import { AttachmentThumbnail } from '@/components/attachment-thumbnail';
 
 /**
  * Attachment gallery (PR7 task 7.3, spec `attachments` → "Attachment display"
- * / "Attachment deletion"): images render as thumbnails and audio as players,
- * both served through the authorized proxy `/api/attachments/<fileId>` — never
- * a public Appwrite URL. Each item carries a delete form wired to the tested
+ * / "Attachment deletion"): images render as thumbnails, audio as players and
+ * documents (pdf/doc/docx/xls/xlsx) as a file chip, all served through the
+ * authorized proxy `/api/attachments/<fileId>` — never a public Appwrite URL.
+ * Each item carries a delete form wired to the tested
  * `deleteAttachmentAction` (file + metadata both removed). Server component;
  * validated by `tsc`/`next build`.
  *
@@ -15,6 +16,13 @@ import { AttachmentThumbnail } from '@/components/attachment-thumbnail';
  * back to the original when a format cannot be decoded in place, and it makes
  * "did it attach?" answerable at a glance.
  */
+function documentLabel(name: string): string {
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0 || dot === name.length - 1) {
+    return 'archivo';
+  }
+  return name.slice(dot + 1).toLowerCase();
+}
 export function AttachmentGallery({
   attachments,
 }: {
@@ -37,6 +45,37 @@ export function AttachmentGallery({
               <AttachmentThumbnail src={src} name={attachment.name} />
             ) : attachment.kind === 'audio' ? (
               <AudioPlayer fileId={attachment.fileId} name={attachment.name} />
+            ) : attachment.kind === 'document' ? (
+              <a
+                href={src}
+                target="_blank"
+                rel="noreferrer"
+                className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded border border-hairline bg-surface-sunken px-1 text-center"
+                title={attachment.name}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="h-6 w-6 text-ink-muted"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14 3v5h5"
+                  />
+                </svg>
+                <span className="text-[0.6rem] font-bold uppercase tracking-wider text-ink-muted">
+                  {documentLabel(attachment.name)}
+                </span>
+              </a>
             ) : (
               <span className="flex h-20 w-20 items-center justify-center rounded border border-hairline bg-surface-sunken text-xs font-semibold text-ink-muted">
                 Archivo

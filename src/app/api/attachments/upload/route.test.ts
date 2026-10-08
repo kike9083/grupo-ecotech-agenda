@@ -114,12 +114,30 @@ describe('handleUpload (spec attachments → Attachment upload)', () => {
 
     const response = await handleUpload(harness.deps, {
       recordId: 'task-1',
-      file: { name: 'doc.pdf', type: 'application/pdf', size: 10, bytes: new Uint8Array() },
+      file: { name: 'nota.txt', type: 'text/plain', size: 10, bytes: new Uint8Array() },
     });
 
     expect(response.status).toBe(400);
     expect(String((await body(response)).error)).toMatch(/no soportado/i);
     expect(harness.files).toEqual([]);
+  });
+
+  it('accepts a document and answers 201', async () => {
+    const harness = makeHarness();
+
+    const response = await handleUpload(harness.deps, {
+      recordId: 'task-1',
+      file: {
+        name: 'presupuesto.xlsx',
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        size: 2048,
+        bytes: new Uint8Array([1]),
+      },
+    });
+
+    expect(response.status).toBe(201);
+    expect(harness.files).toHaveLength(1);
+    expect((await body(response)).attachment).toBeDefined();
   });
 
   it('denies a peer with 403 and nothing stored', async () => {
