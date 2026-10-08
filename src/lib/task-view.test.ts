@@ -49,10 +49,11 @@ describe('statusLabel', () => {
 });
 
 describe('typeLabel', () => {
-  it('labels every record type in Spanish, including notes', () => {
+  it('labels every record type in Spanish, including notes and events', () => {
     expect(typeLabel('task')).toBe('Tarea');
     expect(typeLabel('request')).toBe('Solicitud');
     expect(typeLabel('note')).toBe('Nota');
+    expect(typeLabel('event')).toBe('Cita');
   });
 });
 

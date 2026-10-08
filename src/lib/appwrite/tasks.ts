@@ -1,6 +1,7 @@
 import { ID, Permission, Query, Role } from 'node-appwrite';
 import {
   canTransition,
+  type EditableTaskRecord,
   type TaskRecord,
   type TaskStatus,
   type TaskType,
@@ -43,6 +44,11 @@ export interface DatabasesLike {
     documentId: string,
     data?: Record<string, unknown>,
     permissions?: string[],
+  ): Promise<RawDocument>;
+  getDocument(
+    databaseId: string,
+    collectionId: string,
+    documentId: string,
   ): Promise<RawDocument>;
 }
 
@@ -306,6 +312,51 @@ export function createTasksApi(
           config.collectionId,
           documentId,
           { status: to },
+        );
+        return toTask(doc);
+      } catch (error) {
+        throw toDomainError(error);
+      }
+    },
+
+    /**
+     * One record by id for the edit route: null when the caller's session
+     * cannot see it (Appwrite answers 404 for an unreadable document, which
+     * `toDomainError` already maps to `not-found`).
+     */
+    async getTask(documentId: string): Promise<Task | null> {
+      try {
+        const doc = await databases.getDocument(
+          config.databaseId,
+          config.collectionId,
+          documentId,
+        );
+        return toTask(doc);
+      } catch (error) {
+        const domain = toDomainError(error);
+        if (domain.kind === 'not-found') {
+          return null;
+        }
+        throw domain;
+      }
+    },
+
+    /**
+     * Partial edit (spec → owner write): only the validated attributes are
+     * sent, so `status`, ownership and `bodyHtml` survive untouched. WHO may
+     * write is decided by the injected credential (session for owners, API
+     * key for the admin override) exactly like `updateStatus`.
+     */
+    async updateTask(
+      documentId: string,
+      record: EditableTaskRecord,
+    ): Promise<Task> {
+      try {
+        const doc = await databases.updateDocument(
+          config.databaseId,
+          config.collectionId,
+          documentId,
+          { ...record },
         );
         return toTask(doc);
       } catch (error) {

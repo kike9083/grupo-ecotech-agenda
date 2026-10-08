@@ -31,6 +31,7 @@ describe('parseHomeQuery', () => {
       searching: false,
       created: false,
       noted: false,
+      updated: false,
     });
   });
 
@@ -45,6 +46,7 @@ describe('parseHomeQuery', () => {
       searching: true,
       created: true,
       noted: false,
+      updated: false,
     });
   });
 
@@ -57,6 +59,7 @@ describe('parseHomeQuery', () => {
       searching: false,
       created: false,
       noted: false,
+      updated: false,
     });
   });
 
@@ -69,6 +72,7 @@ describe('parseHomeQuery', () => {
       searching: true,
       created: false,
       noted: false,
+      updated: false,
     });
   });
 
@@ -82,6 +86,13 @@ describe('parseHomeQuery', () => {
     expect(parseHomeQuery({ noted: '1' }).noted).toBe(true);
     expect(parseHomeQuery({ noted: '0' }).noted).toBe(false);
     expect(parseHomeQuery({}).noted).toBe(false);
+  });
+
+  it('only flags the edit banner for the exact updated=1 marker', () => {
+    expect(parseHomeQuery({ updated: '1' }).updated).toBe(true);
+    expect(parseHomeQuery({ updated: '0' }).updated).toBe(false);
+    expect(parseHomeQuery({ updated: 'yes' }).updated).toBe(false);
+    expect(parseHomeQuery({}).updated).toBe(false);
   });
 });
 

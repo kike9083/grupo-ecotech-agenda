@@ -70,6 +70,10 @@ class FakeDatabases implements DatabasesLike {
   async updateDocument(): Promise<RawDocument> {
     return { $id: 'doc-1' };
   }
+
+  async getDocument(): Promise<RawDocument> {
+    return { $id: 'doc-1' };
+  }
 }
 
 function makeDeps(fake: FakeDatabases): CreateNoteDeps & {

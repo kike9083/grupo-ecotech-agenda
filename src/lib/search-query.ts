@@ -34,6 +34,8 @@ export interface HomeQuery {
   created: boolean;
   /** `?noted=1` marker set by the note create flow's success redirect. */
   noted: boolean;
+  /** `?updated=1` marker set by the edit flow's success redirect. */
+  updated: boolean;
 }
 
 /** First value when a parameter repeats; `undefined` becomes the empty string. */
@@ -72,6 +74,7 @@ export function parseHomeQuery(params: RawSearchParams | undefined): HomeQuery {
     searching: q !== '',
     created: firstValue(params?.created) === '1',
     noted: firstValue(params?.noted) === '1',
+    updated: firstValue(params?.updated) === '1',
   };
 }
 

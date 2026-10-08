@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { TaskPage } from '@/lib/appwrite/tasks';
 import type { Attachment } from '@/lib/appwrite/attachments';
 import { AttachmentForm } from '@/components/attachment-form';
@@ -145,6 +146,15 @@ export function TaskList({
                   </>
                 )}
               </div>
+
+              {isNote ? null : (
+                <Link
+                  href={`/editar?id=${task.$id}`}
+                  className="btn btn-secondary btn-sm shrink-0"
+                >
+                  Editar
+                </Link>
+              )}
 
               {isNote ? null : (
                 <StatusControls

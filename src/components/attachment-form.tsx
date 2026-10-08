@@ -15,6 +15,7 @@ export function AttachmentForm({ recordId }: { recordId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -29,6 +30,7 @@ export function AttachmentForm({ recordId }: { recordId: string }) {
 
     setPending(true);
     setError(null);
+    setSuccess(false);
     try {
       const response = await fetch('/api/attachments/upload', {
         method: 'POST',
@@ -44,6 +46,9 @@ export function AttachmentForm({ recordId }: { recordId: string }) {
       if (inputRef.current !== null) {
         inputRef.current.value = '';
       }
+      // Explicit confirmation: without it a silent refresh reads as "nothing
+      // happened" and the user assumes the attachment was lost.
+      setSuccess(true);
       router.refresh();
     } catch {
       setError('No se pudo subir el archivo. Intenta de nuevo.');
@@ -77,6 +82,11 @@ export function AttachmentForm({ recordId }: { recordId: string }) {
       {error !== null ? (
         <p role="alert" className="text-xs text-red-700">
           {error}
+        </p>
+      ) : null}
+      {success ? (
+        <p role="status" className="text-xs text-accent-ink">
+          Archivo adjuntado correctamente.
         </p>
       ) : null}
     </form>

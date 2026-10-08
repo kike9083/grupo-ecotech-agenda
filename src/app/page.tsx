@@ -182,7 +182,7 @@ export default async function HomePage({
     redirect('/login?error=expired');
   }
 
-  const { q, from, to, cursor, created, noted } = parseHomeQuery(
+  const { q, from, to, cursor, created, noted, updated } = parseHomeQuery(
     await searchParams,
   );
   const admin = await isAdmin();
@@ -273,6 +273,12 @@ export default async function HomePage({
         {noted ? (
           <p role="status" className="banner banner-success">
             Nota creada correctamente.
+          </p>
+        ) : null}
+
+        {updated ? (
+          <p role="status" className="banner banner-success">
+            Registro actualizado correctamente.
           </p>
         ) : null}
 

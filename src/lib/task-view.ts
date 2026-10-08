@@ -44,6 +44,8 @@ export function typeLabel(type: TaskType): string {
       return 'Solicitud';
     case 'note':
       return 'Nota';
+    case 'event':
+      return 'Cita';
   }
 }
 

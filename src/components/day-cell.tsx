@@ -44,7 +44,7 @@ export function DayCell({
           href={buildCalendarHref({ month: monthKey, day: date })}
           className={[
             'rounded-full px-2 text-xs font-medium',
-            selected ? 'bg-accent text-white' : 'text-ink-muted',
+            selected ? 'bg-accent-ink text-white' : 'text-ink-muted',
             inMonth ? '' : 'text-ink-subtle',
           ]
             .filter((className) => className !== '')
@@ -107,7 +107,10 @@ export function DayDetail({
       ) : (
         <ul className="flex flex-col gap-1">
           {records.map((record) => (
-            <li key={record.$id} className="flex items-center gap-2 text-sm">
+            <li
+              key={record.$id}
+              className="flex flex-wrap items-center gap-2 text-sm"
+            >
               <span className="badge badge-accent">
                 {typeLabel(record.type)}
               </span>
@@ -120,6 +123,12 @@ export function DayDetail({
               <span className="badge badge-neutral">
                 {statusLabel(record.status)}
               </span>
+              <Link
+                href={`/editar?id=${record.$id}`}
+                className="btn btn-secondary btn-sm ml-auto"
+              >
+                Editar
+              </Link>
             </li>
           ))}
         </ul>

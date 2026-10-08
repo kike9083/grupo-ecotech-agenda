@@ -72,49 +72,53 @@ export function MonthGrid({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <Link
-          href={buildCalendarHref({
-            month: `${previous.year}-${String(previous.month).padStart(2, '0')}`,
-          })}
-          className="btn btn-secondary"
-        >
-          {CALENDAR_PREV_LABEL}
-        </Link>
-        <h2 className="text-lg font-semibold">{formatMonthTitle(year, month)}</h2>
-        <Link
-          href={buildCalendarHref({
-            month: `${next.year}-${String(next.month).padStart(2, '0')}`,
-          })}
-          className="btn btn-secondary"
-        >
-          {CALENDAR_NEXT_LABEL}
-        </Link>
-      </div>
+      <section className="card p-4 sm:p-5">
+        <div className="flex items-center justify-between">
+          <Link
+            href={buildCalendarHref({
+              month: `${previous.year}-${String(previous.month).padStart(2, '0')}`,
+            })}
+            className="btn btn-secondary"
+          >
+            {CALENDAR_PREV_LABEL}
+          </Link>
+          <h2 className="text-lg font-semibold">
+            {formatMonthTitle(year, month)}
+          </h2>
+          <Link
+            href={buildCalendarHref({
+              month: `${next.year}-${String(next.month).padStart(2, '0')}`,
+            })}
+            className="btn btn-secondary"
+          >
+            {CALENDAR_NEXT_LABEL}
+          </Link>
+        </div>
 
-      {resolveCalendarState(datedCount) === 'empty' ? (
-        <p className="meta">{CALENDAR_EMPTY_MESSAGE}</p>
-      ) : null}
+        {resolveCalendarState(datedCount) === 'empty' ? (
+          <p className="meta mt-3">{CALENDAR_EMPTY_MESSAGE}</p>
+        ) : null}
 
-      <div className="grid grid-cols-7 gap-1 text-center meta font-medium">
-        {WEEKDAY_LABELS.map((label) => (
-          <span key={label}>{label}</span>
-        ))}
-      </div>
+        <div className="mt-4 grid grid-cols-7 gap-1 text-center meta font-medium">
+          {WEEKDAY_LABELS.map((label) => (
+            <span key={label}>{label}</span>
+          ))}
+        </div>
 
-      <div className="grid grid-cols-7 gap-1">
-        {grid.map((cell) => (
-          <DayCell
-            key={cell.date}
-            date={cell.date}
-            day={cell.day}
-            inMonth={cell.inMonth}
-            records={recordsByDate[cell.date] ?? []}
-            selected={selectedDay === cell.date}
-            monthKey={monthKey}
-          />
-        ))}
-      </div>
+        <div className="mt-1 grid grid-cols-7 gap-1">
+          {grid.map((cell) => (
+            <DayCell
+              key={cell.date}
+              date={cell.date}
+              day={cell.day}
+              inMonth={cell.inMonth}
+              records={recordsByDate[cell.date] ?? []}
+              selected={selectedDay === cell.date}
+              monthKey={monthKey}
+            />
+          ))}
+        </div>
+      </section>
 
       {selectedDay !== undefined ? (
         <DayDetail

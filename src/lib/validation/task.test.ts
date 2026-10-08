@@ -238,7 +238,7 @@ describe('buildTaskRecord', () => {
 
 describe('TASK_TYPES (spec task-registration → type enum gains note)', () => {
   it('lists task, request and note in order', () => {
-    expect(TASK_TYPES).toEqual(['task', 'request', 'note']);
+    expect(TASK_TYPES).toEqual(['task', 'request', 'note', 'event']);
   });
 });
 

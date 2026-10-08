@@ -24,6 +24,12 @@ import {
   type StatusUpdateInput,
   type StatusUpdateState,
 } from '@/lib/task-status';
+import {
+  INITIAL_UPDATE_STATE,
+  performUpdateTask,
+  type UpdateTaskInput,
+  type UpdateTaskState,
+} from '@/lib/task-update';
 
 /** Reads the raw form payload — every field optional so gaps become field errors. */
 function readDraft(formData: FormData): {
@@ -145,4 +151,63 @@ export async function updateStatusAction(
     redirect(SESSION_EXPIRED_REDIRECT);
   }
   return { message: STATUS_ERROR_MESSAGES[result.reason] };
+}
+
+/**
+ * Edit-record server action (design D3): thin adapter over the tested
+ * `performUpdateTask` flow. Local gates (missing id, non-owner without the
+ * admin flag, validation) resolve before any data-layer call; on success both
+ * lists re-render and the home route shows the update banner.
+ */
+export async function updateTaskAction(
+  _prevState: UpdateTaskState,
+  formData: FormData,
+): Promise<UpdateTaskState> {
+  const draft = readDraft(formData);
+  const input: UpdateTaskInput = {
+    documentId: String(formData.get('documentId') ?? ''),
+    createdBy: String(formData.get('createdBy') ?? ''),
+  };
+
+  const user = await getCurrentUser();
+  const secret = await getSessionSecret();
+  if (user === null || secret === null) {
+    redirect(SESSION_EXPIRED_REDIRECT);
+  }
+
+  const admin = await isAdmin();
+  const env = loadEnv();
+  // Admin writes only take the API-key path for someone else's record —
+  // a member's own record keeps the session credential (design D2).
+  const useAdminClient = admin && input.createdBy !== user.id;
+  const api = createTasksApi(
+    useAdminClient
+      ? new Databases(createAdminClient())
+      : new Databases(createSessionClient(secret)),
+    {
+      databaseId: env.APPWRITE_DATABASE_ID,
+      collectionId: env.APPWRITE_TASKS_COLLECTION_ID,
+      adminsTeamId: env.APPWRITE_ADMINS_TEAM_ID,
+    },
+  );
+
+  let state: UpdateTaskState = INITIAL_UPDATE_STATE;
+
+  await performUpdateTask(
+    {
+      ownerId: user.id,
+      admin,
+      updateTask: (documentId, record) => api.updateTask(documentId, record),
+      onInvalid: (next) => {
+        state = next;
+      },
+      redirect: (to) => {
+        redirect(to);
+      },
+    },
+    input,
+    draft,
+  );
+
+  return state;
 }

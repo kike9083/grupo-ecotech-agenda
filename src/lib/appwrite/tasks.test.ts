@@ -52,11 +52,18 @@ interface UpdateCall {
   data: Record<string, unknown> | undefined;
 }
 
+interface GetCall {
+  databaseId: string;
+  collectionId: string;
+  documentId: string;
+}
+
 /** Records every invocation — asserts go against the wire payload, not mocks (design D5). */
 class FakeDatabases implements DatabasesLike {
   createCalls: CreateCall[] = [];
   listCalls: ListCall[] = [];
   updateCalls: UpdateCall[] = [];
+  getCalls: GetCall[] = [];
   /** When set, the next call rejects with it (one-shot), like a real failure. */
   nextError: unknown = undefined;
   nextList: { total: number; documents: RawDocument[] } = {
@@ -114,6 +121,21 @@ class FakeDatabases implements DatabasesLike {
     this.takeError();
     // The real service returns the full document after a partial update.
     return { ...storedDocument(documentId), ...data };
+  }
+
+  /** Set to make the next `getDocument` resolve with something else. */
+  nextGet: RawDocument | undefined = undefined;
+
+  async getDocument(
+    databaseId: string,
+    collectionId: string,
+    documentId: string,
+  ): Promise<RawDocument> {
+    this.getCalls.push({ databaseId, collectionId, documentId });
+    this.takeError();
+    const document = this.nextGet ?? storedDocument(documentId);
+    this.nextGet = undefined;
+    return document;
   }
 }
 
@@ -481,6 +503,104 @@ describe('updateStatus', () => {
       api.updateStatus('doc-9', 'cancelled', 'in_progress'),
     ).rejects.toThrow('Invalid status transition');
     expect(fake.updateCalls).toHaveLength(0);
+  });
+});
+
+describe('getTask', () => {
+  it('reads one record with the provisioned ids', async () => {
+    const fake = new FakeDatabases();
+    const api = createTasksApi(fake, config);
+
+    const task = await api.getTask('doc-7');
+
+    expect(fake.getCalls[0]).toEqual({
+      databaseId: 'agenda',
+      collectionId: 'tasks',
+      documentId: 'doc-7',
+    });
+    expect(task).toMatchObject({ $id: 'doc-7', title: 'Task doc-7' });
+  });
+
+  it('maps a 404 to null instead of throwing', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = {
+      code: 404,
+      type: 'document_not_found',
+      message: 'Document not found',
+    };
+    const api = createTasksApi(fake, config);
+
+    await expect(api.getTask('missing')).resolves.toBeNull();
+  });
+
+  it('re-throws any non-not-found failure', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = {
+      code: 401,
+      type: 'user_unauthorized',
+      message: 'No permission',
+    };
+    const api = createTasksApi(fake, config);
+
+    await expect(api.getTask('doc-7')).rejects.toMatchObject({
+      kind: 'unauthorized',
+    });
+  });
+});
+
+describe('updateTask', () => {
+  it('sends ONLY the editable attributes so lifecycle and body survive', async () => {
+    const fake = new FakeDatabases();
+    const api = createTasksApi(fake, config);
+
+    const updated = await api.updateTask('doc-9', {
+      type: 'event',
+      title: 'Cita con el cliente',
+      description: 'Planta norte',
+      date: '2026-10-09',
+      time: '15:30',
+      searchText: 'Cita con el cliente Planta norte',
+    });
+
+    expect(fake.updateCalls[0]).toMatchObject({
+      databaseId: 'agenda',
+      collectionId: 'tasks',
+      documentId: 'doc-9',
+      data: {
+        type: 'event',
+        title: 'Cita con el cliente',
+        description: 'Planta norte',
+        date: '2026-10-09',
+        time: '15:30',
+        searchText: 'Cita con el cliente Planta norte',
+      },
+    });
+    expect(fake.updateCalls[0].data).not.toHaveProperty('status');
+    expect(fake.updateCalls[0].data).not.toHaveProperty('createdBy');
+    expect(fake.updateCalls[0].data).not.toHaveProperty('bodyHtml');
+    expect(updated.$id).toBe('doc-9');
+    expect(updated.title).toBe('Cita con el cliente');
+  });
+
+  it('maps a rejection to a typed domain error', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = {
+      code: 403,
+      type: 'user_unauthorized',
+      message: 'Missing permission',
+    };
+    const api = createTasksApi(fake, config);
+
+    await expect(
+      api.updateTask('doc-9', {
+        type: 'task',
+        title: 'x',
+        description: '',
+        date: '2026-10-01',
+        time: '',
+        searchText: 'x',
+      }),
+    ).rejects.toMatchObject({ kind: 'unauthorized' });
   });
 });
 

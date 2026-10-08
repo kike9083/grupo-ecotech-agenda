@@ -7,11 +7,16 @@
  * layer persists whatever `buildTaskRecord` produces.
  */
 
-export type TaskType = 'task' | 'request' | 'note';
+export type TaskType = 'task' | 'request' | 'note' | 'event';
 
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
 
-export const TASK_TYPES: readonly TaskType[] = ['task', 'request', 'note'];
+export const TASK_TYPES: readonly TaskType[] = [
+  'task',
+  'request',
+  'note',
+  'event',
+];
 
 /** Every lifecycle status in transition order (spec task-registration). */
 export const TASK_STATUSES: readonly TaskStatus[] = [
@@ -188,6 +193,32 @@ export function buildTaskRecord(
     status: 'open',
     createdBy: owner.id,
     createdByEmail: owner.email,
+    searchText: buildSearchText(draft.title, draft.description),
+  };
+}
+
+/**
+ * Attributes an edit may change. `status`, ownership and `bodyHtml` are
+ * deliberately absent — the update flow sends this as a PARTIAL payload so an
+ * edit can never reset a lifecycle state or rewrite a note body.
+ */
+export interface EditableTaskRecord {
+  type: TaskType;
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  searchText: string;
+}
+
+/** Partial payload for an edit: the validated draft plus the derived index. */
+export function buildTaskUpdate(draft: ValidatedTaskDraft): EditableTaskRecord {
+  return {
+    type: draft.type,
+    title: draft.title,
+    description: draft.description,
+    date: draft.date,
+    time: draft.time,
     searchText: buildSearchText(draft.title, draft.description),
   };
 }

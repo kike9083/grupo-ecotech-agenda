@@ -14,22 +14,28 @@
   --color-hairline: #e2e8f0;
   --color-hairline-soft: rgb(15 23 42 / 0.06);
 
-  /* Brand (accent is never used for large fills) */
+  /* Brand — `accent` is the identity colour (icons, focus rings, large
+     fills); `accent-ink` is the same hue darkened until text sitting on it
+     clears WCAG AA (5.48:1 on white, 5.15:1 on canvas). `accent-hover` is
+     one step deeper still so a pressed/hovered button keeps AA against its
+     own white label (7.68:1). */
   --color-accent: #059669;
-  --color-accent-hover: #047857;
+  --color-accent-ink: #047857;
+  --color-accent-hover: #065f46;
   --color-accent-soft: #ecfdf5;
 
   /* Text hierarchy */
   --color-ink: #0f172a;
   --color-ink-muted: #475569;
-  --color-ink-subtle: #94a3b8;
+  --color-ink-subtle: #656d7c;
 
-  /* Task states */
-  --color-state-done: #059669;
+  /* Task states — chosen so each label clears AA on its own pill
+     (done 4.84:1, pending 4.51:1, cancelled 6.92:1). */
+  --color-state-done: #047857;
   --color-state-done-bg: #d1fae5;
-  --color-state-pending: #d97706;
+  --color-state-pending: #b45309;
   --color-state-pending-bg: #fef3c7;
-  --color-state-cancelled: #64748b;
+  --color-state-cancelled: #475569;
   --color-state-cancelled-bg: #f1f5f9;
 
   /* Feedback */
@@ -108,7 +114,7 @@ h4 {
   }
 
   .btn-primary {
-    background: var(--color-accent);
+    background: var(--color-accent-ink);
     color: #ffffff;
   }
   .btn-primary:hover:not(:disabled) {
@@ -129,7 +135,7 @@ h4 {
 
   .btn-ghost {
     background: transparent;
-    color: var(--color-accent);
+    color: var(--color-accent-ink);
   }
   .btn-ghost:hover:not(:disabled) {
     background: var(--color-accent-soft);
@@ -227,7 +233,7 @@ h4 {
     background: var(--color-state-cancelled-bg);
   }
   .badge-accent {
-    color: var(--color-accent-hover);
+    color: var(--color-accent-ink);
     background: var(--color-accent-soft);
   }
   .badge-neutral {
@@ -244,7 +250,7 @@ h4 {
   }
   .banner-success {
     background: var(--color-accent-soft);
-    color: var(--color-accent-hover);
+    color: var(--color-accent-ink);
     border: 1px solid #a7f3d0;
   }
   .banner-danger {
@@ -281,6 +287,6 @@ h4 {
     transition: color 0.15s ease;
   }
   .link-quiet:hover {
-    color: var(--color-accent);
+    color: var(--color-accent-ink);
   }
 }
