@@ -36,6 +36,8 @@ export interface HomeQuery {
   noted: boolean;
   /** `?updated=1` marker set by the edit flow's success redirect. */
   updated: boolean;
+  /** `?deleted=1` marker set by the delete flow's success redirect. */
+  deleted: boolean;
 }
 
 /** First value when a parameter repeats; `undefined` becomes the empty string. */
@@ -75,6 +77,7 @@ export function parseHomeQuery(params: RawSearchParams | undefined): HomeQuery {
     created: firstValue(params?.created) === '1',
     noted: firstValue(params?.noted) === '1',
     updated: firstValue(params?.updated) === '1',
+    deleted: firstValue(params?.deleted) === '1',
   };
 }
 

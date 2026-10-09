@@ -32,6 +32,7 @@ describe('parseHomeQuery', () => {
       created: false,
       noted: false,
       updated: false,
+      deleted: false,
     });
   });
 
@@ -47,6 +48,7 @@ describe('parseHomeQuery', () => {
       created: true,
       noted: false,
       updated: false,
+      deleted: false,
     });
   });
 
@@ -60,6 +62,7 @@ describe('parseHomeQuery', () => {
       created: false,
       noted: false,
       updated: false,
+      deleted: false,
     });
   });
 
@@ -73,6 +76,7 @@ describe('parseHomeQuery', () => {
       created: false,
       noted: false,
       updated: false,
+      deleted: false,
     });
   });
 
@@ -93,6 +97,13 @@ describe('parseHomeQuery', () => {
     expect(parseHomeQuery({ updated: '0' }).updated).toBe(false);
     expect(parseHomeQuery({ updated: 'yes' }).updated).toBe(false);
     expect(parseHomeQuery({}).updated).toBe(false);
+  });
+
+  it('only flags the delete banner for the exact deleted=1 marker', () => {
+    expect(parseHomeQuery({ deleted: '1' }).deleted).toBe(true);
+    expect(parseHomeQuery({ deleted: '0' }).deleted).toBe(false);
+    expect(parseHomeQuery({ deleted: 'yes' }).deleted).toBe(false);
+    expect(parseHomeQuery({}).deleted).toBe(false);
   });
 });
 

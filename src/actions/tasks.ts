@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { Databases } from 'node-appwrite';
+import { Databases, Storage } from 'node-appwrite';
 import { createAdminClient, createSessionClient } from '@/lib/appwrite/clients';
 import { loadEnv } from '@/lib/env';
 import {
@@ -10,6 +10,11 @@ import {
   getSessionSecret,
   isAdmin,
 } from '@/lib/appwrite/session';
+import {
+  ATTACHMENTS_BUCKET_ID,
+  ATTACHMENTS_COLLECTION_ID,
+  createAttachmentsApi,
+} from '@/lib/appwrite/attachments';
 import { createTasksApi } from '@/lib/appwrite/tasks';
 import {
   INITIAL_CREATE_STATE,
@@ -17,6 +22,12 @@ import {
   performCreateTask,
   type CreateTaskState,
 } from '@/lib/task-creation';
+import {
+  INITIAL_DELETE_STATE,
+  performDeleteTask,
+  type DeleteTaskInput,
+  type DeleteTaskState,
+} from '@/lib/task-delete';
 import {
   INITIAL_STATUS_UPDATE_STATE,
   STATUS_ERROR_MESSAGES,
@@ -207,6 +218,88 @@ export async function updateTaskAction(
     },
     input,
     draft,
+  );
+
+  return state;
+}
+
+/**
+ * Delete-record server action (design D3): thin adapter over the tested
+ * `performDeleteTask` flow. The attachment cascade always runs on the
+ * API-key client so it never depends on the caller reading another owner's
+ * rows; the record itself takes the same owner/admin credential split as
+ * `updateTaskAction`. Success revalidates every list and redirects to the
+ * home route's delete banner.
+ */
+export async function deleteTaskAction(
+  _prevState: DeleteTaskState,
+  formData: FormData,
+): Promise<DeleteTaskState> {
+  const input: DeleteTaskInput = {
+    documentId: String(formData.get('documentId') ?? ''),
+    createdBy: String(formData.get('createdBy') ?? ''),
+  };
+
+  const user = await getCurrentUser();
+  const secret = await getSessionSecret();
+  if (user === null || secret === null) {
+    redirect(SESSION_EXPIRED_REDIRECT);
+  }
+
+  const admin = await isAdmin();
+  const env = loadEnv();
+
+  const attachments = createAttachmentsApi(
+    new Databases(createAdminClient()),
+    new Storage(createAdminClient()),
+    {
+      databaseId: env.APPWRITE_DATABASE_ID,
+      bucketId: ATTACHMENTS_BUCKET_ID,
+      collectionId: ATTACHMENTS_COLLECTION_ID,
+    },
+  );
+
+  // Admin writes only take the API-key path for someone else's record —
+  // a member's own record keeps the session credential (design D2).
+  const useAdminClient = admin && input.createdBy !== user.id;
+  const tasks = createTasksApi(
+    useAdminClient
+      ? new Databases(createAdminClient())
+      : new Databases(createSessionClient(secret)),
+    {
+      databaseId: env.APPWRITE_DATABASE_ID,
+      collectionId: env.APPWRITE_TASKS_COLLECTION_ID,
+      adminsTeamId: env.APPWRITE_ADMINS_TEAM_ID,
+    },
+  );
+
+  let state: DeleteTaskState = INITIAL_DELETE_STATE;
+
+  await performDeleteTask(
+    {
+      ownerId: user.id,
+      admin,
+      listAttachments: async (recordId) =>
+        (await attachments.listAttachments(recordId)).map((attachment) => ({
+          documentId: attachment.$id,
+          fileId: attachment.fileId,
+        })),
+      deleteFile: (fileId) => attachments.deleteAttachmentFile(fileId),
+      deleteAttachmentDocument: (documentId) =>
+        attachments.deleteAttachmentDocument(documentId),
+      deleteTask: (documentId) => tasks.deleteTask(documentId),
+      onInvalid: (next) => {
+        state = next;
+      },
+      redirect: (to) => {
+        revalidatePath('/');
+        revalidatePath('/admin');
+        revalidatePath('/calendario');
+        revalidatePath('/editar');
+        redirect(to);
+      },
+    },
+    input,
   );
 
   return state;

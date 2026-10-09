@@ -3,6 +3,7 @@ import type { TaskPage } from '@/lib/appwrite/tasks';
 import type { Attachment } from '@/lib/appwrite/attachments';
 import { AttachmentForm } from '@/components/attachment-form';
 import { AttachmentGallery } from '@/components/attachment-gallery';
+import { DeleteTaskButton } from '@/components/delete-task-button';
 import { NoteBody } from '@/components/note-body';
 import { StatusControls } from '@/components/status-controls';
 import { plainTextFromHtml } from '@/lib/rich-text';
@@ -147,14 +148,19 @@ export function TaskList({
                 )}
               </div>
 
-              {isNote ? null : (
-                <Link
-                  href={`/editar?id=${task.$id}`}
-                  className="btn btn-secondary btn-sm shrink-0"
-                >
-                  Editar
-                </Link>
-              )}
+              <div className="flex shrink-0 items-center gap-2">
+                {isNote ? null : (
+                  <Link
+                    href={`/editar?id=${task.$id}`}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    Editar
+                  </Link>
+                )}
+                <DeleteTaskButton
+                  task={{ $id: task.$id, createdBy: task.createdBy }}
+                />
+              </div>
 
               {isNote ? null : (
                 <StatusControls

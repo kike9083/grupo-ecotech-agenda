@@ -141,6 +141,30 @@ h4 {
     background: var(--color-accent-soft);
   }
 
+  /* Destructive: filled for the final confirm, ghost for the first step.
+     White on #ba1a1a is 6.46:1, so the label clears WCAG AA. */
+  .btn-danger {
+    background: var(--color-danger);
+    color: #ffffff;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: #b31515;
+    transform: translateY(-0.5px);
+  }
+
+  .btn-danger-ghost {
+    background: transparent;
+    color: var(--color-danger);
+  }
+  .btn-danger-ghost:hover:not(:disabled) {
+    background: var(--color-danger-bg);
+  }
+
+  .btn-danger:focus-visible,
+  .btn-danger-ghost:focus-visible {
+    box-shadow: 0 0 0 3px rgb(186 26 26 / 0.35);
+  }
+
   .btn-sm {
     padding: 0.3125rem 0.75rem;
     font-size: 0.8125rem;

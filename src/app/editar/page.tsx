@@ -14,6 +14,7 @@ import { PageShell } from '@/components/page-shell';
 import { TaskForm } from '@/components/task-form';
 import { AttachmentGallery } from '@/components/attachment-gallery';
 import { AttachmentForm } from '@/components/attachment-form';
+import { DeleteTaskButton } from '@/components/delete-task-button';
 import type { RawSearchParams } from '@/lib/search-query';
 
 /**
@@ -123,6 +124,21 @@ export default async function EditarPage({
           </div>
           <AttachmentGallery attachments={attachments} />
           <AttachmentForm recordId={task.$id} />
+        </section>
+
+        <section className="card flex flex-wrap items-center justify-between gap-3 border-danger/30 p-5">
+          <div>
+            <h2 className="text-sm font-semibold text-danger">
+              Zona de peligro
+            </h2>
+            <p className="meta mt-0.5">
+              Eliminar este registro borra también sus archivos adjuntos y no
+              se puede deshacer.
+            </p>
+          </div>
+          <DeleteTaskButton
+            task={{ $id: task.$id, createdBy: task.createdBy }}
+          />
         </section>
       </div>
     </PageShell>

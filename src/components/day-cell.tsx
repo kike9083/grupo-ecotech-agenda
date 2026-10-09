@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Task } from '@/lib/appwrite/tasks';
 import { buildCalendarHref, formatDayTitle } from '@/lib/calendar';
+import { DeleteTaskButton } from '@/components/delete-task-button';
 import { statusLabel, typeLabel } from '@/lib/task-view';
 
 /**
@@ -123,12 +124,17 @@ export function DayDetail({
               <span className="badge badge-neutral">
                 {statusLabel(record.status)}
               </span>
-              <Link
-                href={`/editar?id=${record.$id}`}
-                className="btn btn-secondary btn-sm ml-auto"
-              >
-                Editar
-              </Link>
+              <span className="ml-auto flex items-center gap-2">
+                <Link
+                  href={`/editar?id=${record.$id}`}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Editar
+                </Link>
+                <DeleteTaskButton
+                  task={{ $id: record.$id, createdBy: record.createdBy }}
+                />
+              </span>
             </li>
           ))}
         </ul>

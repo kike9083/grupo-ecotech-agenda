@@ -182,9 +182,8 @@ export default async function HomePage({
     redirect('/login?error=expired');
   }
 
-  const { q, from, to, cursor, created, noted, updated } = parseHomeQuery(
-    await searchParams,
-  );
+  const { q, from, to, cursor, created, noted, updated, deleted } =
+    parseHomeQuery(await searchParams);
   const admin = await isAdmin();
   const telegramState = await loadTelegramEntryState(secret, user.id);
   const telegram = telegramEntry(telegramState);
@@ -279,6 +278,12 @@ export default async function HomePage({
         {updated ? (
           <p role="status" className="banner banner-success">
             Registro actualizado correctamente.
+          </p>
+        ) : null}
+
+        {deleted ? (
+          <p role="status" className="banner banner-success">
+            Registro eliminado correctamente.
           </p>
         ) : null}
 
