@@ -120,3 +120,35 @@ export function buildNoteRecord(
     searchText: buildSearchText(draft.title, bodyText),
   };
 }
+
+/**
+ * Attributes a note edit may change. Mirrors `EditableTaskRecord` but carries
+ * the body, which only notes have — `updateTask` deliberately cannot send it,
+ * so the two write paths stay separate instead of widening one to fit both.
+ * `type`, ownership and `status` are absent for the same reason.
+ */
+export interface EditableNoteRecord {
+  title: string;
+  date: string;
+  bodyHtml: string;
+  searchText: string;
+}
+
+/**
+ * Partial payload for a note edit: the validated draft plus the derived index.
+ * `searchText` is rebuilt from the title AND the plain body text exactly like
+ * `buildNoteRecord`, so an edited note keeps its content searchable — routing
+ * a note through the task path would index the description instead and drop
+ * the body from search.
+ */
+export function buildNoteUpdate(
+  draft: ValidatedNoteDraft,
+  bodyText: string,
+): EditableNoteRecord {
+  return {
+    title: draft.title,
+    date: draft.date,
+    bodyHtml: draft.bodyHtml,
+    searchText: buildSearchText(draft.title, bodyText),
+  };
+}

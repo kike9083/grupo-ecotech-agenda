@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildNoteRecord, validateNoteDraft } from './note';
+import { buildNoteRecord, buildNoteUpdate, validateNoteDraft } from './note';
 
 const owner = { id: 'user-123', email: 'ana@grupoecotech.com' };
 
@@ -134,5 +134,49 @@ describe('buildNoteRecord (design D1 sentinels)', () => {
 
     expect(record.searchText).toHaveLength(700);
     expect(record.searchText).toBe('t'.repeat(200) + ' ' + 'b'.repeat(499));
+  });
+});
+
+describe('buildNoteUpdate (note edit payload)', () => {
+  it('sends only the editable attributes plus the derived index', () => {
+    const validated = validateNoteDraft({
+      title: 'Acuerdo',
+      date: '2026-10-09',
+      bodyHtml: '<p>Texto de la nota</p>',
+    });
+    expect(validated.ok).toBe(true);
+    if (!validated.ok) return;
+
+    expect(buildNoteUpdate(validated.value, 'Texto de la nota')).toEqual({
+      title: 'Acuerdo',
+      date: '2026-10-09',
+      bodyHtml: '<p>Texto de la nota</p>',
+      searchText: 'Acuerdo Texto de la nota',
+    });
+  });
+
+  it('never carries the attributes a note edit must not touch', () => {
+    const validated = validateNoteDraft({ title: 'Acuerdo', bodyHtml: '<p>x</p>' });
+    expect(validated.ok).toBe(true);
+    if (!validated.ok) return;
+
+    const keys = Object.keys(buildNoteUpdate(validated.value, 'x'));
+
+    expect(keys).toEqual(
+      expect.arrayContaining(['title', 'date', 'bodyHtml', 'searchText']),
+    );
+    for (const forbidden of ['type', 'status', 'time', 'description', 'createdBy']) {
+      expect(keys).not.toContain(forbidden);
+    }
+  });
+
+  it('indexes the body text, not the (always empty) note description', () => {
+    const validated = validateNoteDraft({ title: ' agua', bodyHtml: '<p>pago</p>' });
+    expect(validated.ok).toBe(true);
+    if (!validated.ok) return;
+
+    const update = buildNoteUpdate(validated.value, 'pago');
+
+    expect(update.searchText).toBe('agua pago');
   });
 });

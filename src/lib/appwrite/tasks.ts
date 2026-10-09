@@ -1,4 +1,5 @@
 import { ID, Permission, Query, Role } from 'node-appwrite';
+import type { EditableNoteRecord } from '@/lib/validation/note';
 import {
   canTransition,
   type EditableTaskRecord,
@@ -355,6 +356,29 @@ export function createTasksApi(
     async updateTask(
       documentId: string,
       record: EditableTaskRecord,
+    ): Promise<Task> {
+      try {
+        const doc = await databases.updateDocument(
+          config.databaseId,
+          config.collectionId,
+          documentId,
+          { ...record },
+        );
+        return toTask(doc);
+      } catch (error) {
+        throw toDomainError(error);
+      }
+    },
+
+    /**
+     * Partial note edit: the sibling of `updateTask`, kept separate because a
+     * note's body lives in `bodyHtml` — the attribute `updateTask` refuses to
+     * send. Title, date, body and the rebuilt search index travel together;
+     * `type`, ownership and `status` are untouched, exactly like the task path.
+     */
+    async updateNote(
+      documentId: string,
+      record: EditableNoteRecord,
     ): Promise<Task> {
       try {
         const doc = await databases.updateDocument(

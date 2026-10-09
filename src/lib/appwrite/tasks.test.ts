@@ -659,6 +659,56 @@ describe('updateTask', () => {
   });
 });
 
+describe('updateNote', () => {
+  it('sends the body and the rebuilt index while lifecycle attributes stay put', async () => {
+    const fake = new FakeDatabases();
+    const api = createTasksApi(fake, config);
+
+    const updated = await api.updateNote('doc-7', {
+      title: 'Acuerdo de octubre',
+      date: '2026-10-09',
+      bodyHtml: '<p>Texto nuevo</p>',
+      searchText: 'Acuerdo de octubre Texto nuevo',
+    });
+
+    expect(fake.updateCalls[0]).toMatchObject({
+      databaseId: 'agenda',
+      collectionId: 'tasks',
+      documentId: 'doc-7',
+      data: {
+        title: 'Acuerdo de octubre',
+        date: '2026-10-09',
+        bodyHtml: '<p>Texto nuevo</p>',
+        searchText: 'Acuerdo de octubre Texto nuevo',
+      },
+    });
+    expect(fake.updateCalls[0].data).not.toHaveProperty('type');
+    expect(fake.updateCalls[0].data).not.toHaveProperty('status');
+    expect(fake.updateCalls[0].data).not.toHaveProperty('createdBy');
+    expect(fake.updateCalls[0].data).not.toHaveProperty('time');
+    expect(updated.$id).toBe('doc-7');
+  });
+
+  it('maps a rejection to a typed domain error', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = {
+      code: 404,
+      type: 'document_not_found',
+      message: 'Document not found',
+    };
+    const api = createTasksApi(fake, config);
+
+    await expect(
+      api.updateNote('missing', {
+        title: 'x',
+        date: '',
+        bodyHtml: '',
+        searchText: 'x',
+      }),
+    ).rejects.toMatchObject({ kind: 'not-found' });
+  });
+});
+
 describe('domain error mapping (task 3.3)', () => {
   it('maps a 404 from listDocuments to not-found', async () => {
     const fake = new FakeDatabases();
