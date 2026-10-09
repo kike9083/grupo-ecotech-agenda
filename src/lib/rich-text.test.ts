@@ -69,4 +69,26 @@ describe('sanitizeNoteHtml (spec note-capture → Rich-text body and sanitizatio
   it('returns an empty string for empty input', () => {
     expect(sanitizeNoteHtml('')).toBe('');
   });
+
+  it('strips inline style attributes so pasted markup cannot overlay the UI', () => {
+    const clean = sanitizeNoteHtml(
+      '<p style="position:fixed;inset:0;background:url(https://evil.test/pixel)">Hola</p>',
+    );
+
+    expect(clean).toBe('<p>Hola</p>');
+    expect(clean).not.toContain('style');
+    expect(clean).not.toContain('url(');
+  });
+
+  it('keeps link attributes while dropping style from headings and lists', () => {
+    const clean = sanitizeNoteHtml(
+      '<h2 style="background:url(https://evil.test/x)">Título</h2>' +
+        '<ul><li style="position:fixed">Uno</li></ul>' +
+        '<a href="https://example.test" style="position:fixed">enlace</a>',
+    );
+
+    expect(clean).toContain('href="https://example.test"');
+    expect(clean).not.toContain('style');
+    expect(clean).not.toContain('position:fixed');
+  });
 });

@@ -10,6 +10,12 @@ import sanitizeHtml from 'sanitize-html';
  * Whitelist for note bodies: the Tiptap starter-kit formatting set only.
  * `sanitize-html` strips `<script>` (with its content), inline event handlers
  * (`onerror`, …) and non-`http(s)`/`mailto` URLs by default.
+ *
+ * `style` is deliberately NOT allowed: `sanitize-html` passes CSS verbatim, so
+ * an inline style could carry `position:fixed` overlays or `url()` trackers
+ * that `NoteBody` would then render through `dangerouslySetInnerHTML`.
+ * StarterKit never emits inline styles, so only pasted styled markup loses
+ * its decoration.
  */
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
@@ -38,13 +44,6 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   ],
   allowedAttributes: {
     a: ['href', 'target', 'rel'],
-    p: ['style'],
-    span: ['style'],
-    h1: ['style'],
-    h2: ['style'],
-    h3: ['style'],
-    h4: ['style'],
-    li: ['style'],
   },
   allowedSchemes: ['http', 'https', 'mailto'],
   transformTags: {
