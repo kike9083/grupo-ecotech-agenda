@@ -171,6 +171,16 @@ export type DeleteResult =
   | { ok: true }
   | { ok: false; reason: AttachmentFailureReason };
 
+/** State the delete control re-renders with after a submission. */
+export interface DeleteAttachmentState {
+  /** Inline Spanish banner for a failed deletion; null while idle or after success. */
+  formError: string | null;
+}
+
+export const INITIAL_DELETE_ATTACHMENT_STATE: DeleteAttachmentState = {
+  formError: null,
+};
+
 /**
  * Deletes the stored file FIRST, then the metadata row. If the file delete
  * fails the metadata is kept, so no document ever points at a missing file.

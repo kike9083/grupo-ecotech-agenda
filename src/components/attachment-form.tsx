@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { ATTACHMENT_ACCEPT } from '@/lib/attachments';
 
 /**
  * Upload form for one record (PR6 task 6.6, spec `attachments` → "Attachment
@@ -21,6 +22,11 @@ export function AttachmentForm({ recordId }: { recordId: string }) {
     event.preventDefault();
     const file = inputRef.current?.files?.[0];
     if (file === undefined) {
+      // Judge finding: a bare `return` here made "Adjuntar" look dead — the
+      // server's 400 is unreachable from this path, so the form must say why
+      // nothing happened instead of staying silent.
+      setSuccess(false);
+      setError('Selecciona un archivo antes de adjuntar.');
       return;
     }
 
@@ -57,6 +63,12 @@ export function AttachmentForm({ recordId }: { recordId: string }) {
     }
   }
 
+  /** Picking a file clears the previous reason so the stale banner never lingers. */
+  function handleFileChange(_event: ChangeEvent<HTMLInputElement>): void {
+    setError(null);
+    setSuccess(false);
+  }
+
   const inputId = `attachment-${recordId}`;
 
   return (
@@ -69,7 +81,8 @@ export function AttachmentForm({ recordId }: { recordId: string }) {
         id={inputId}
         name="file"
         type="file"
-        accept="image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
+        accept={ATTACHMENT_ACCEPT}
+        onChange={handleFileChange}
         className="text-xs"
       />
       <button

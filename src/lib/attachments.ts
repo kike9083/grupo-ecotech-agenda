@@ -69,6 +69,16 @@ const EXTENSION_MIME: Readonly<Record<string, string>> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
+/**
+ * The `accept` attribute for the file input, DERIVED from the same extension
+ * keys the server validates against: the picker can neither offer a type that
+ * the route rejects (gif/bmp/flac via `image/*`) nor hide one it accepts
+ * (heic/m4a/mp4). `image/*`/`audio/*` wildcards are deliberately avoided.
+ */
+export const ATTACHMENT_ACCEPT: string = Object.keys(EXTENSION_MIME)
+  .map((extension) => `.${extension}`)
+  .join(',');
+
 /** Spanish copy shown inline by the upload form (spec → "inline Spanish error"). */
 export const ATTACHMENT_ERROR_MESSAGES: Record<AttachmentRejectionReason, string> = {
   'too-large': `El archivo es demasiado grande (máximo ${MAX_ATTACHMENT_MB} MB).`,

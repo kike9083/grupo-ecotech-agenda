@@ -1,16 +1,17 @@
-import { deleteAttachmentAction } from '@/actions/attachments';
 import type { Attachment } from '@/lib/appwrite/attachments';
 import { AudioPlayer } from '@/components/audio-player';
 import { AttachmentThumbnail } from '@/components/attachment-thumbnail';
+import { DeleteAttachmentButton } from '@/components/delete-attachment-button';
 
 /**
  * Attachment gallery (PR7 task 7.3, spec `attachments` → "Attachment display"
  * / "Attachment deletion"): images render as thumbnails, audio as players and
  * documents (pdf/doc/docx/xls/xlsx) as a file chip, all served through the
  * authorized proxy `/api/attachments/<fileId>` — never a public Appwrite URL.
- * Each item carries a delete form wired to the tested
- * `deleteAttachmentAction` (file + metadata both removed). Server component;
- * validated by `tsc`/`next build`.
+ * Each item carries a delete control wired to the tested
+ * `deleteAttachmentAction` (file + metadata both removed); it lives in its own
+ * client component so a failed deletion can show its Spanish reason inline.
+ * Server component; validated by `tsc`/`next build`.
  *
  * Every tile also shows the file NAME as a link: it is the always-visible way
  * back to the original when a format cannot be decoded in place, and it makes
@@ -89,19 +90,7 @@ export function AttachmentGallery({
             >
               {attachment.name}
             </a>
-            <form action={deleteAttachmentAction}>
-              <input
-                type="hidden"
-                name="documentId"
-                value={attachment.$id}
-              />
-              <button
-                type="submit"
-                className="text-xs text-red-700 underline"
-              >
-                Eliminar
-              </button>
-            </form>
+            <DeleteAttachmentButton documentId={attachment.$id} />
           </li>
         );
       })}

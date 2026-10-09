@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ATTACHMENT_ACCEPT,
   ATTACHMENT_ERROR_MESSAGES,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENT_MB,
@@ -199,5 +200,57 @@ describe('cap alignment (verify suggestion 3 → constant, bucket, copy)', () =>
     expect(ATTACHMENT_ERROR_MESSAGES['too-large']).toBe(
       `El archivo es demasiado grande (máximo ${MAX_ATTACHMENT_MB} MB).`,
     );
+  });
+});
+
+/**
+ * Judge finding: the file input used to advertise `image/*,audio/*`, which
+ * offers gif/bmp/flac — guaranteed `unsupported-type` — while hiding `.heic`,
+ * `.m4a` and `.mp4`, which the route accepts. The `accept` attribute is now
+ * DERIVED from the same extension keys the validator walks, so the two can
+ * never drift apart again.
+ */
+describe('ATTACHMENT_ACCEPT (picker and validator share one allow-list)', () => {
+  it('pins the offered extensions at the bucket allow-list', () => {
+    expect(ATTACHMENT_ACCEPT.split(',')).toEqual([
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.webp',
+      '.heic',
+      '.webm',
+      '.mp3',
+      '.wav',
+      '.ogg',
+      '.m4a',
+      '.mp4',
+      '.aac',
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+    ]);
+  });
+
+  it('offers only extensions the validator accepts', () => {
+    const extensions = ATTACHMENT_ACCEPT.split(',');
+    expect(extensions.length).toBeGreaterThan(0);
+    for (const entry of extensions) {
+      const result = validateAttachment({
+        name: `archivo${entry}`,
+        type: '',
+        size: 1024,
+      });
+      expect(result.ok, `${entry} debe ser aceptado por el validador`).toBe(true);
+    }
+  });
+
+  it('never offers a wildcard that the route would reject', () => {
+    expect(ATTACHMENT_ACCEPT).not.toMatch(/[*\/]/);
+    expect(validateAttachment({ name: 'x.gif', type: 'image/gif', size: 1024 })).toEqual({
+      ok: false,
+      reason: 'unsupported-type',
+    });
   });
 });
