@@ -50,6 +50,11 @@ export interface DatabasesLike {
     collectionId: string,
     documentId: string,
   ): Promise<RawDocument>;
+  deleteDocument(
+    databaseId: string,
+    collectionId: string,
+    documentId: string,
+  ): Promise<unknown>;
 }
 
 /** Identifiers of the provisioned Appwrite resources (env contract, D4). */
@@ -359,6 +364,26 @@ export function createTasksApi(
           { ...record },
         );
         return toTask(doc);
+      } catch (error) {
+        throw toDomainError(error);
+      }
+    },
+
+    /**
+     * Unconditional delete (spec → "Delete record"): there is no undo, so the
+     * caller is responsible for confirming with the user and for clearing the
+     * record's attachments first. WHO may delete is decided by the injected
+     * credential (session for the owner, API key for the admin override)
+     * exactly like `updateTask` — Appwrite normalizes `write` to include
+     * delete, so the session client can only remove its own documents.
+     */
+    async deleteTask(documentId: string): Promise<void> {
+      try {
+        await databases.deleteDocument(
+          config.databaseId,
+          config.collectionId,
+          documentId,
+        );
       } catch (error) {
         throw toDomainError(error);
       }

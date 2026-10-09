@@ -58,12 +58,19 @@ interface GetCall {
   documentId: string;
 }
 
+interface DeleteCall {
+  databaseId: string;
+  collectionId: string;
+  documentId: string;
+}
+
 /** Records every invocation — asserts go against the wire payload, not mocks (design D5). */
 class FakeDatabases implements DatabasesLike {
   createCalls: CreateCall[] = [];
   listCalls: ListCall[] = [];
   updateCalls: UpdateCall[] = [];
   getCalls: GetCall[] = [];
+  deleteCalls: DeleteCall[] = [];
   /** When set, the next call rejects with it (one-shot), like a real failure. */
   nextError: unknown = undefined;
   nextList: { total: number; documents: RawDocument[] } = {
@@ -136,6 +143,16 @@ class FakeDatabases implements DatabasesLike {
     const document = this.nextGet ?? storedDocument(documentId);
     this.nextGet = undefined;
     return document;
+  }
+
+  async deleteDocument(
+    databaseId: string,
+    collectionId: string,
+    documentId: string,
+  ): Promise<unknown> {
+    this.deleteCalls.push({ databaseId, collectionId, documentId });
+    this.takeError();
+    return {};
   }
 }
 
@@ -503,6 +520,44 @@ describe('updateStatus', () => {
       api.updateStatus('doc-9', 'cancelled', 'in_progress'),
     ).rejects.toThrow('Invalid status transition');
     expect(fake.updateCalls).toHaveLength(0);
+  });
+});
+
+describe('deleteTask', () => {
+  it('removes the record with the provisioned ids', async () => {
+    const fake = new FakeDatabases();
+    const api = createTasksApi(fake, config);
+
+    await api.deleteTask('doc-9');
+
+    expect(fake.deleteCalls).toEqual([
+      { databaseId: 'agenda', collectionId: 'tasks', documentId: 'doc-9' },
+    ]);
+  });
+
+  it('maps a 404 to a typed not-found instead of leaking the SDK error', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = {
+      code: 404,
+      type: 'document_not_found',
+      message: 'Document not found',
+    };
+    const api = createTasksApi(fake, config);
+
+    await expect(api.deleteTask('doc-9')).rejects.toMatchObject({
+      kind: 'not-found',
+    });
+    expect(fake.deleteCalls).toHaveLength(1);
+  });
+
+  it('maps a permission failure to unauthorized', async () => {
+    const fake = new FakeDatabases();
+    fake.nextError = { code: 401, type: 'user_unauthorized', message: 'no' };
+    const api = createTasksApi(fake, config);
+
+    await expect(api.deleteTask('doc-9')).rejects.toMatchObject({
+      kind: 'unauthorized',
+    });
   });
 });
 
