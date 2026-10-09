@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { createNoteAction } from '@/actions/notes';
+import { createNoteAction, updateNoteAction } from '@/actions/notes';
 import {
   INITIAL_NOTE_STATE,
   type CreateNoteState,
@@ -11,13 +11,25 @@ import {
 import { NOTE_TITLE_MAX_LENGTH } from '@/lib/validation/note';
 
 /**
- * Create-note form (PR3 task 3.4, spec `note-capture`): a client component
- * wrapping the `createNoteAction` server action with `useActionState`. The
- * body is authored in a Tiptap editor (StarterKit) and submitted as HTML
- * through a hidden `bodyHtml` input; the title and date are optional. The
- * editor renders client-side only (`immediatelyRender: false`) so SSR and
- * hydration stay in sync.
+ * Note form (PR3 task 3.4, spec `note-capture`): a client component wrapping
+ * the note server actions with `useActionState`. Without `recordId` it
+ * creates through `createNoteAction`; with it, it edits through
+ * `updateNoteAction` — notes previously had no edit affordance anywhere, so
+ * the calendar's Editar link dead-ended in `TaskForm`, which requires a time
+ * a note never stores. The body is authored in a Tiptap editor (StarterKit)
+ * and submitted as HTML through a hidden `bodyHtml` input; the title and date
+ * are optional. The editor renders client-side only (`immediatelyRender:
+ * false`) so SSR and hydration stay in sync.
  */
+interface NoteFormProps {
+  /** Present → edit this note instead of creating a new one. */
+  recordId?: string;
+  /** Owner id, advisory — the action re-checks it against the session. */
+  createdBy?: string;
+  /** Server-rendered current values for edit mode. */
+  initial?: { title: string; date: string; bodyHtml: string };
+}
+
 function FieldError({ message }: { message?: string }) {
   if (message === undefined) {
     return null;
@@ -29,10 +41,15 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-export function NoteForm() {
+export function NoteForm({ recordId, createdBy, initial }: NoteFormProps = {}) {
+  // Both actions share the same state shape, so the hook never changes shape
+  // between modes — only which action it dispatches to.
+  const action = recordId === undefined ? createNoteAction : updateNoteAction;
   const [state, formAction, pending] = useActionState<CreateNoteState, FormData>(
-    createNoteAction,
-    INITIAL_NOTE_STATE,
+    action,
+    recordId === undefined
+      ? INITIAL_NOTE_STATE
+      : { fieldErrors: {}, formError: null, values: initial ?? {} },
   );
   const values = state.values;
   const [bodyHtml, setBodyHtml] = useState(values.bodyHtml ?? '');
@@ -54,6 +71,12 @@ export function NoteForm() {
 
   return (
     <form action={formAction} className="card flex flex-col gap-4 p-5">
+      {recordId !== undefined ? (
+        <>
+          <input type="hidden" name="documentId" defaultValue={recordId} />
+          <input type="hidden" name="createdBy" defaultValue={createdBy ?? ''} />
+        </>
+      ) : null}
       {state.formError !== null ? (
         <p role="alert" className="banner banner-danger">
           {state.formError}
@@ -139,7 +162,11 @@ export function NoteForm() {
           disabled={pending}
           className="btn btn-primary disabled:opacity-60"
         >
-          {pending ? 'Guardando…' : 'Guardar nota'}
+          {pending
+            ? 'Guardando…'
+            : recordId === undefined
+              ? 'Guardar nota'
+              : 'Guardar cambios'}
         </button>
         <a
           href="/"

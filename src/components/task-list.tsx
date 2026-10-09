@@ -149,14 +149,12 @@ export function TaskList({
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
-                {isNote ? null : (
-                  <Link
-                    href={`/editar?id=${task.$id}`}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    Editar
-                  </Link>
-                )}
+                <Link
+                  href={`/editar?id=${task.$id}`}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Editar
+                </Link>
                 <DeleteTaskButton
                   task={{ $id: task.$id, createdBy: task.createdBy }}
                 />

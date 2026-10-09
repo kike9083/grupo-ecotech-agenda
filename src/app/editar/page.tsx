@@ -12,17 +12,21 @@ import { createTasksApi } from '@/lib/appwrite/tasks';
 import { loadEnv } from '@/lib/env';
 import { PageShell } from '@/components/page-shell';
 import { TaskForm } from '@/components/task-form';
+import { NoteForm } from '@/components/note-form';
 import { AttachmentGallery } from '@/components/attachment-gallery';
 import { AttachmentForm } from '@/components/attachment-form';
 import { DeleteTaskButton } from '@/components/delete-task-button';
+import { sanitizeNoteHtml } from '@/lib/rich-text';
 import type { RawSearchParams } from '@/lib/search-query';
 
 /**
  * Edit route: an RSC shell that guards the session, loads the target record
  * with the caller's own credential (session for a member, API key for an
- * admin — design D2) and renders `TaskForm` in edit mode. A record the caller
- * cannot read is indistinguishable from a missing one, so both answer 404.
- * All mutation logic lives in `updateTaskAction`.
+ * admin — design D2) and renders the matching form — `TaskForm` for tasks,
+ * requests and events, `NoteForm` for notes (a note cannot survive
+ * `validateTaskDraft`, and `TaskForm` cannot write `bodyHtml`). A record the
+ * caller cannot read is indistinguishable from a missing one, so both answer
+ * 404. All mutation logic lives in the server actions behind the forms.
  */
 export default async function EditarPage({
   searchParams,
@@ -101,17 +105,32 @@ export default async function EditarPage({
       }
     >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-        <TaskForm
-          recordId={task.$id}
-          createdBy={task.createdBy}
-          initial={{
-            type: task.type,
-            title: task.title,
-            description: task.description,
-            date: task.date,
-            time: task.time,
-          }}
-        />
+        {task.type === 'note' ? (
+          // Notes have their own form: TaskForm demands an HH:MM a note never
+          // stores and cannot carry bodyHtml, so routing one here blocked the
+          // save and silently dropped the body from search.
+          <NoteForm
+            recordId={task.$id}
+            createdBy={task.createdBy}
+            initial={{
+              title: task.title,
+              date: task.date,
+              bodyHtml: sanitizeNoteHtml(task.bodyHtml ?? ''),
+            }}
+          />
+        ) : (
+          <TaskForm
+            recordId={task.$id}
+            createdBy={task.createdBy}
+            initial={{
+              type: task.type,
+              title: task.title,
+              description: task.description,
+              date: task.date,
+              time: task.time,
+            }}
+          />
+        )}
 
         <section className="card flex flex-col gap-3 p-5">
           <div>
