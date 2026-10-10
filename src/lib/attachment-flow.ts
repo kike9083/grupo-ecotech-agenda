@@ -183,7 +183,10 @@ export const INITIAL_DELETE_ATTACHMENT_STATE: DeleteAttachmentState = {
 
 /**
  * Deletes the stored file FIRST, then the metadata row. If the file delete
- * fails the metadata is kept, so no document ever points at a missing file.
+ * fails for a reason other than "already gone", the metadata is kept, so no
+ * document ever points at a missing file. A 404 is the opposite case: the
+ * file is already absent, so the row is removed anyway — keeping it would
+ * strand a document pointing at nothing and every retry would fail forever.
  */
 export async function performDelete(
   deps: DeleteDeps,
@@ -205,6 +208,14 @@ export async function performDelete(
 
   try {
     await deps.deleteFile(existing.fileId);
+  } catch (error) {
+    const domain = toDomainError(error);
+    if (domain.kind !== 'not-found') {
+      return { ok: false, reason: domain.kind };
+    }
+  }
+
+  try {
     await deps.deleteDocument(input.documentId);
     return { ok: true };
   } catch (error) {

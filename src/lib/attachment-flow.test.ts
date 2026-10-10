@@ -330,7 +330,7 @@ describe('performDelete (spec attachments → Attachment deletion)', () => {
     expect(deps.deletedDocuments).toEqual(['att-1']);
   });
 
-  it('keeps the metadata when the file delete fails, so state never points at a missing file', async () => {
+  it('removes the metadata when the file is already gone, so no row is stranded', async () => {
     const deps = makeDeleteHarness({
       fileError: { code: 404, type: 'storage_file_not_found', message: 'gone' },
     });
@@ -341,7 +341,22 @@ describe('performDelete (spec attachments → Attachment deletion)', () => {
       admin: false,
     });
 
-    expect(result).toEqual({ ok: false, reason: 'not-found' });
+    expect(result).toEqual({ ok: true });
+    expect(deps.deletedDocuments).toEqual(['att-1']);
+  });
+
+  it('keeps the metadata when the file delete fails for any other reason', async () => {
+    const deps = makeDeleteHarness({
+      fileError: { code: 403, type: 'user_unauthorized', message: 'nope' },
+    });
+
+    const result = await performDelete(deps, {
+      documentId: 'att-1',
+      ownerId: uploader,
+      admin: false,
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'unauthorized' });
     expect(deps.deletedDocuments).toEqual([]);
   });
 });

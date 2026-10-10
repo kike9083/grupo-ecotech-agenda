@@ -64,7 +64,10 @@ export async function deleteAttachmentAction(
     if (result.reason === 'session-expired') {
       redirect('/login?error=expired');
     }
-    // Already gone is success: the file the user wanted removed is gone.
+    // The row is already gone — the only way to reach `not-found` now, since
+    // a missing FILE no longer aborts the cascade. That is the requested end
+    // state, so a retried or double-submitted delete converges on success
+    // instead of leaving a dead button behind.
     if (result.reason !== 'not-found') {
       return { formError: ATTACHMENT_FAILURE_MESSAGES[result.reason] };
     }
