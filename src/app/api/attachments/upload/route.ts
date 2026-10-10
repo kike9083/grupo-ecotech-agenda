@@ -12,6 +12,7 @@ import {
 import { toDomainError } from '@/lib/appwrite/errors';
 import { getCurrentUser, getSessionSecret, isAdmin } from '@/lib/appwrite/session';
 import { loadEnv } from '@/lib/env';
+import { MAX_ATTACHMENT_BYTES } from '@/lib/attachments';
 import {
   ATTACHMENT_FAILURE_MESSAGES,
   attachmentFailureStatus,
@@ -43,6 +44,9 @@ export interface UploadRequestInput {
   recordId: string;
   file: UploadFileInput | null;
 }
+
+/** Slack for the multipart envelope around the file itself. */
+const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 
 function json(data: Record<string, unknown>, status: number): Response {
   return Response.json(data, { status });
@@ -94,7 +98,30 @@ async function readFileEntry(entry: FormDataEntryValue | null): Promise<UploadFi
   };
 }
 
+/**
+ * Multipart framing (boundaries + the `recordId` part) only ever adds a few
+ * kilobytes on top of the file, so a `Content-Length` meaningfully above the
+ * cap is an oversized file. Answering here keeps `formData()` from buffering
+ * the whole thing into Node memory first — a 3 GB pick would otherwise be
+ * read to completion before `validateAttachment` says no.
+ */
+export function rejectOversizedBody(contentLength: string | null): Response | null {
+  if (contentLength === null) {
+    return null;
+  }
+  const bytes = Number(contentLength);
+  if (!Number.isFinite(bytes) || bytes <= MAX_ATTACHMENT_BYTES + MULTIPART_OVERHEAD_BYTES) {
+    return null;
+  }
+  return json({ error: ATTACHMENT_FAILURE_MESSAGES['too-large'] }, attachmentFailureStatus('too-large'));
+}
+
 export async function POST(request: Request): Promise<Response> {
+  const tooLarge = rejectOversizedBody(request.headers.get('content-length'));
+  if (tooLarge !== null) {
+    return tooLarge;
+  }
+
   const form = await request.formData();
   const file = await readFileEntry(form.get('file'));
   const recordId = String(form.get('recordId') ?? '');

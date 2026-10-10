@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Attachment, AttachmentRecord } from '@/lib/appwrite/attachments';
 import { MAX_ATTACHMENT_BYTES } from '@/lib/attachments';
 import { performUpload, type UploadInput, type UploadResult } from '@/lib/attachment-flow';
-import { handleUpload, type UploadRouteDeps } from './route';
+import { handleUpload, rejectOversizedBody, type UploadRouteDeps } from './route';
 
 /**
  * RED seam for PR6 task 6.4 (spec `attachments` → "Oversized or wrong type"):
@@ -174,5 +174,29 @@ describe('handleUpload (spec attachments → Attachment upload)', () => {
 
     expect(response.status).toBe(400);
     expect(harness.files).toEqual([]);
+  });
+});
+
+describe('rejectOversizedBody (pre-parse size gate)', () => {
+  it('answers the normal oversized message before the body is read', async () => {
+    const response = rejectOversizedBody(String(MAX_ATTACHMENT_BYTES * 2));
+
+    expect(response?.status).toBe(400);
+    expect(String((await body(response as Response)).error)).toMatch(
+      /demasiado grande/i,
+    );
+  });
+
+  it('lets anything at or near the cap fall through to the same validation', () => {
+    // Framing adds kilobytes, so a small overage cannot be judged from the
+    // header alone — `validateAttachment` still owns the exact decision.
+    expect(rejectOversizedBody(String(MAX_ATTACHMENT_BYTES + 1))).toBeNull();
+    expect(rejectOversizedBody(String(MAX_ATTACHMENT_BYTES))).toBeNull();
+  });
+
+  it('stays silent when the header is absent or malformed', () => {
+    expect(rejectOversizedBody(null)).toBeNull();
+    expect(rejectOversizedBody('no-es-un-numero')).toBeNull();
+    expect(rejectOversizedBody('1024')).toBeNull();
   });
 });
