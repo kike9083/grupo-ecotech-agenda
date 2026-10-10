@@ -5,6 +5,7 @@ import { performUpload, type UploadInput, type UploadResult } from '@/lib/attach
 import {
   gateUploadRequest,
   handleUpload,
+  readGatedUploadBody,
   rejectOversizedBody,
   type UploadRouteDeps,
 } from './route';
@@ -208,39 +209,44 @@ describe('rejectOversizedBody (pre-parse size gate)', () => {
 
 describe('gateUploadRequest (identity and size are judged before the body)', () => {
   /** Reading this body throws, so a gate that parses first fails the test. */
-  function requestWithPoisonBody(): Request {
-    const poison = new ReadableStream({
+  function poisonBody(): ReadableStream {
+    return new ReadableStream({
       pull() {
-        throw new Error('the body was read before the session was checked');
+        throw new Error('the body was read before the gates ran');
       },
     });
+  }
+
+  function poisonRequest(contentLength?: string): Request {
     return new Request('http://localhost/api/attachments/upload', {
       method: 'POST',
-      body: poison,
+      ...(contentLength === undefined
+        ? {}
+        : { headers: { 'content-length': contentLength } }),
+      body: poisonBody(),
       duplex: 'half',
     } as RequestInit);
   }
 
   it('answers 401 without a session and never reads the body', async () => {
-    const response = gateUploadRequest(null, requestWithPoisonBody());
+    const response = gateUploadRequest(false, poisonRequest());
 
     expect(response?.status).toBe(401);
     expect(String((await body(response as Response)).error)).toMatch(/sesi/i);
   });
 
-  it('still rejects an oversized body before parsing when there is a session', async () => {
-    const request = new Request('http://localhost/api/attachments/upload', {
-      method: 'POST',
-      headers: { 'content-length': String(MAX_ATTACHMENT_BYTES * 2) },
-      body: 'payload',
-    });
+  it('rejects an oversized body before parsing, with or without a session', async () => {
+    for (const hasSession of [true, false]) {
+      const response = gateUploadRequest(
+        hasSession,
+        poisonRequest(String(MAX_ATTACHMENT_BYTES * 2)),
+      );
 
-    const response = gateUploadRequest('user-owner', request);
-
-    expect(response?.status).toBe(400);
-    expect(String((await body(response as Response)).error)).toMatch(
-      /demasiado grande/i,
-    );
+      expect(response?.status).toBe(400);
+      expect(String((await body(response as Response)).error)).toMatch(
+        /demasiado grande/i,
+      );
+    }
   });
 
   it('lets a normal session through to the parser', () => {
@@ -249,8 +255,28 @@ describe('gateUploadRequest (identity and size are judged before the body)', () 
       headers: { 'content-length': '1286' },
       body: 'payload',
     });
+    expect(gateUploadRequest(true, request)).toBeNull();
+    expect(gateUploadRequest(true, poisonRequest())).toBeNull();
+  });
 
-    expect(gateUploadRequest('user-owner', request)).toBeNull();
-    expect(gateUploadRequest('user-owner', requestWithPoisonBody())).toBeNull();
+  it('only parses once both gates pass', async () => {
+    const denied = await readGatedUploadBody(poisonRequest(), false);
+    expect('response' in denied && denied.response.status).toBe(401);
+
+    const oversized = await readGatedUploadBody(
+      poisonRequest(String(MAX_ATTACHMENT_BYTES * 2)),
+      true,
+    );
+    expect('response' in oversized && oversized.response.status).toBe(400);
+
+    const parsed = await readGatedUploadBody(
+      new Request('http://localhost/api/attachments/upload', {
+        method: 'POST',
+        body: new URLSearchParams({ recordId: 'rec-1' }),
+      }),
+      true,
+    );
+    expect('form' in parsed).toBe(true);
+    expect('form' in parsed && parsed.form.get('recordId')).toBe('rec-1');
   });
 });

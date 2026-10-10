@@ -117,39 +117,58 @@ export function rejectOversizedBody(contentLength: string | null): Response | nu
 }
 
 /**
- * Both gates that must run BEFORE `request.formData()`. Resolving the session
- * first is what keeps a stale or absent cookie from buffering a 30 MB body
- * only to answer 401 — the parser materialises the whole multipart into
- * memory, so anything read after `formData()` is read too late.
+ * Everything that must run BEFORE `request.formData()`.
  *
- * The `Content-Length` gate stays best-effort: a client is allowed to omit the
- * header (HTTP/2 never requires it), and when it does we fall back to the
- * post-parse cap in `validateAttachment` rather than failing a legitimate
- * upload closed.
+ * The size gate is header-only and needs no network, so it answers a clearly
+ * oversized body before we pay the round-trip that resolves the session. The
+ * session gate then runs before the parser materialises the whole multipart
+ * into Node memory — a stale or absent cookie would otherwise buffer 30 MB to
+ * answer 401. Whatever comes after this call is read too late.
+ *
+ * `Content-Length` stays best-effort: HTTP/2 clients may omit it, and when it
+ * is absent the post-parse cap in `validateAttachment` owns the decision
+ * rather than failing a legitimate upload closed.
  */
-export function gateUploadRequest(
-  sessionUserId: string | null,
-  request: Request,
-): Response | null {
-  if (sessionUserId === null) {
-    return json({ error: ATTACHMENT_FAILURE_MESSAGES['session-expired'] }, 401);
+export function gateUploadRequest(hasSession: boolean, request: Request): Response | null {
+  const tooLarge = rejectOversizedBody(request.headers.get('content-length'));
+  if (tooLarge !== null) {
+    return tooLarge;
   }
-  return rejectOversizedBody(request.headers.get('content-length'));
+  if (!hasSession) {
+    return json(
+      { error: ATTACHMENT_FAILURE_MESSAGES['session-expired'] },
+      attachmentFailureStatus('session-expired'),
+    );
+  }
+  return null;
+}
+
+/**
+ * `POST` stripped of its Appwrite wiring, so the ordering these gates promise
+ * is actually pinned: a body that throws when read must survive untouched.
+ */
+export async function readGatedUploadBody(
+  request: Request,
+  hasSession: boolean,
+): Promise<{ response: Response } | { form: FormData }> {
+  const gated = gateUploadRequest(hasSession, request);
+  if (gated !== null) {
+    return { response: gated };
+  }
+  return { form: await request.formData() };
 }
 
 export async function POST(request: Request): Promise<Response> {
   const user = await getCurrentUser();
   const secret = await getSessionSecret();
+  const sessionUser = user === null || secret === null ? null : user;
 
-  const gated = gateUploadRequest(
-    user === null || secret === null ? null : user.id,
-    request,
-  );
-  if (gated !== null) {
-    return gated;
+  const gated = await readGatedUploadBody(request, sessionUser !== null);
+  if ('response' in gated) {
+    return gated.response;
   }
 
-  const form = await request.formData();
+  const form = gated.form;
   const file = await readFileEntry(form.get('file'));
   const recordId = String(form.get('recordId') ?? '');
 
@@ -157,8 +176,7 @@ export async function POST(request: Request): Promise<Response> {
 
   return handleUpload(
     {
-      getSessionUser: async () =>
-        user === null || secret === null ? null : { id: user.id },
+      getSessionUser: async () => (sessionUser === null ? null : { id: sessionUser.id }),
       isAdmin: () => isAdmin(),
       performUpload: async (input) => {
         // Reads run through the session client (Appwrite enforces the parent
