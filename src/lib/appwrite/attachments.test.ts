@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ATTACHMENT_PAGE_SIZE,
   ATTACHMENTS_BUCKET_ID,
   ATTACHMENTS_COLLECTION_ID,
   createAttachmentsApi,
@@ -59,6 +60,8 @@ class FakeDatabases implements AttachmentDatabasesLike {
     total: 0,
     documents: [],
   };
+  /** When set, each `listDocuments` call shifts the next page off this queue. */
+  nextLists: { total: number; documents: RawDocument[] }[] = [];
   nextDocument: RawDocument | null = null;
 
   private takeError(): void {
@@ -94,7 +97,7 @@ class FakeDatabases implements AttachmentDatabasesLike {
   ): Promise<{ total: number; documents: RawDocument[] }> {
     this.listCalls.push({ databaseId, collectionId, queries });
     this.takeError();
-    return this.nextList;
+    return this.nextLists.shift() ?? this.nextList;
   }
 
   async getDocument(
@@ -285,6 +288,58 @@ describe('listAttachments (spec attachments → Attachment display)', () => {
         { method: 'equal', attribute: 'recordId', values: ['task-1', 'task-2'] },
       ]),
     );
+  });
+
+  it('asks for an explicit page size instead of Appwrite’s 25-row default', async () => {
+    const databases = new FakeDatabases();
+    databases.nextList = { total: 1, documents: [storedAttachment()] };
+    const api = createAttachmentsApi(databases, new FakeStorage(), config);
+
+    await api.listAttachments('task-1');
+
+    expect(parsedQueries(databases.listCalls[0])).toEqual(
+      expect.arrayContaining([
+        { method: 'limit', values: [ATTACHMENT_PAGE_SIZE] },
+      ]),
+    );
+  });
+
+  it('walks the cursor until every row is read, so nothing is truncated', async () => {
+    const page = (ids: string[]): { total: number; documents: RawDocument[] } => ({
+      total: 3,
+      documents: ids.map((id) => storedAttachment({ $id: id })),
+    });
+    const databases = new FakeDatabases();
+    databases.nextLists = [page(['att-a', 'att-b']), page(['att-c'])];
+    const api = createAttachmentsApi(databases, new FakeStorage(), config);
+
+    const attachments = await api.listAttachments('task-1');
+
+    expect(attachments.map((attachment) => attachment.$id)).toEqual([
+      'att-a',
+      'att-b',
+      'att-c',
+    ]);
+    expect(databases.listCalls).toHaveLength(2);
+    expect(parsedQueries(databases.listCalls[1])).toEqual(
+      expect.arrayContaining([{ method: 'cursorAfter', values: ['att-b'] }]),
+    );
+  });
+
+  it('stops when a page repeats a row instead of looping forever', async () => {
+    const databases = new FakeDatabases();
+    databases.nextList = {
+      total: 500,
+      documents: Array.from({ length: ATTACHMENT_PAGE_SIZE }, (_, index) =>
+        storedAttachment({ $id: `att-${index}` }),
+      ),
+    };
+    const api = createAttachmentsApi(databases, new FakeStorage(), config);
+
+    const attachments = await api.listAttachments('task-1');
+
+    expect(attachments).toHaveLength(ATTACHMENT_PAGE_SIZE);
+    expect(databases.listCalls).toHaveLength(2);
   });
 });
 

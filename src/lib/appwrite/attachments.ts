@@ -18,6 +18,14 @@ import { toDomainError } from './errors';
 export const ATTACHMENTS_BUCKET_ID = 'agenda-attachments';
 export const ATTACHMENTS_COLLECTION_ID = 'attachments';
 
+/**
+ * Page size for every attachment list. Appwrite's implicit default is 25
+ * documents ordered oldest-first, so a gallery or a delete cascade over a
+ * record with more than 25 files silently lost the newest rows. Explicit,
+ * well above any real gallery, and walked with a cursor until `total` is hit.
+ */
+export const ATTACHMENT_PAGE_SIZE = 100;
+
 /** A stored document as returned by Appwrite. */
 export interface RawDocument {
   $id: string;
@@ -66,6 +74,59 @@ export interface AttachmentStorageLike {
   ): Promise<RawFile>;
   getFileView(bucketId: string, fileId: string): Promise<ArrayBuffer>;
   deleteFile(bucketId: string, fileId: string): Promise<unknown>;
+}
+
+/**
+ * Reads every row matching `filter`, paging with `cursorAfter` because
+ * `listDocuments` caps a page and orders oldest-first — without the cursor a
+ * gallery, a count and the delete cascade all silently stop at the first
+ * page. The `seen` guard makes a misbehaving server terminate instead of
+ * looping on a page it already returned.
+ */
+async function listAllAttachments(
+  databases: AttachmentDatabasesLike,
+  config: AttachmentsConfig,
+  filter: string[],
+): Promise<Attachment[]> {
+  const collected: RawDocument[] = [];
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+
+  for (;;) {
+    const queries = [...filter, Query.orderAsc('$createdAt')];
+    if (cursor !== undefined) {
+      queries.push(Query.cursorAfter(cursor));
+    }
+    queries.push(Query.limit(ATTACHMENT_PAGE_SIZE));
+
+    const page = await databases.listDocuments(
+      config.databaseId,
+      config.collectionId,
+      queries,
+    );
+
+    let added = 0;
+    for (const doc of page.documents) {
+      if (seen.has(doc.$id)) {
+        continue;
+      }
+      seen.add(doc.$id);
+      collected.push(doc);
+      added += 1;
+    }
+
+    const last = page.documents[page.documents.length - 1];
+    if (
+      added === 0 ||
+      last === undefined ||
+      collected.length >= page.total
+    ) {
+      break;
+    }
+    cursor = last.$id;
+  }
+
+  return collected.map(toAttachment);
 }
 
 /** Identifiers of the provisioned Appwrite resources (design D3). */
@@ -183,19 +244,9 @@ export function createAttachmentsApi(
 
     /** Every attachment of one record, oldest first (spec → display). */
     async listAttachments(recordId: string): Promise<Attachment[]> {
-      try {
-        const result = await databases.listDocuments(
-          config.databaseId,
-          config.collectionId,
-          [
-            Query.equal('recordId', recordId),
-            Query.orderAsc('$createdAt'),
-          ],
-        );
-        return result.documents.map(toAttachment);
-      } catch (error) {
-        throw toDomainError(error);
-      }
+      return listAllAttachments(databases, config, [
+        Query.equal('recordId', recordId),
+      ]);
     },
 
     /** Batched variant for a list page — one query for many records. */
@@ -205,19 +256,9 @@ export function createAttachmentsApi(
       if (recordIds.length === 0) {
         return [];
       }
-      try {
-        const result = await databases.listDocuments(
-          config.databaseId,
-          config.collectionId,
-          [
-            Query.equal('recordId', recordIds),
-            Query.orderAsc('$createdAt'),
-          ],
-        );
-        return result.documents.map(toAttachment);
-      } catch (error) {
-        throw toDomainError(error);
-      }
+      return listAllAttachments(databases, config, [
+        Query.equal('recordId', recordIds),
+      ]);
     },
 
     /** Metadata by document id; null when missing (delete authz seam). */
