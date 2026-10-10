@@ -25,6 +25,12 @@ describe('resolveNoteBodyState', () => {
     expect(resolveNoteBodyState('   ')).toBe('empty');
   });
 
+  it('flags a cleared Tiptap document as empty, not as content', () => {
+    expect(resolveNoteBodyState('<p></p>')).toBe('empty');
+    expect(resolveNoteBodyState('<p><br></p>')).toBe('empty');
+    expect(resolveNoteBodyState('<p>  </p>')).toBe('empty');
+  });
+
   it('flags a stored body as content', () => {
     expect(resolveNoteBodyState('<p>Acta</p>')).toBe('content');
   });

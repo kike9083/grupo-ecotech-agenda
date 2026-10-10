@@ -6,6 +6,8 @@
  * consistent with the rest of the app.
  */
 
+import { normalizeNoteBodyHtml } from '@/lib/rich-text';
+
 export const NOTE_EMPTY_MESSAGE = 'Esta nota no tiene contenido.';
 
 export const NOTE_LOADING_LABEL = 'Cargando nota…';
@@ -17,10 +19,13 @@ export const NOTE_RETRY_LABEL = 'Reintentar';
 
 /**
  * Classifies a stored note body: an absent or blank value renders the empty
- * state, anything else renders sanitized content.
+ * state, anything else renders sanitized content. The body is normalized
+ * first because Tiptap stores `<p></p>` for a document the user cleared —
+ * rows written before normalization existed would otherwise render a blank
+ * block instead of `NOTE_EMPTY_MESSAGE`.
  */
 export function resolveNoteBodyState(
   bodyHtml: string | undefined,
 ): 'empty' | 'content' {
-  return (bodyHtml ?? '').trim() === '' ? 'empty' : 'content';
+  return normalizeNoteBodyHtml(bodyHtml ?? '') === '' ? 'empty' : 'content';
 }
