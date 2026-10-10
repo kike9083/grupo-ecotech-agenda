@@ -557,7 +557,7 @@ async function ensureAttachmentAttribute(
   key: string,
   body: Record<string, unknown>,
   path: string,
-): Promise<boolean> {
+): Promise<'created' | 'updated' | 'unchanged' | 'failed'> {
   const attributes = await getAttachmentsAttributes();
   const existing = attributes.find((entry) => entry.key === key);
 
@@ -567,23 +567,43 @@ async function ensureAttachmentAttribute(
     // Comparing (instead of skipping) is what repairs it — a fresh bucket and
     // a fresh collection must converge on the same shape every run.
     if (path !== '/attributes/enum' || !Array.isArray(existing.elements)) {
-      return false;
+      return 'unchanged';
     }
     const wanted = body.elements as string[];
     const missing = wanted.filter((value) => !existing.elements?.includes(value));
     if (missing.length === 0) {
-      return false;
+      return 'unchanged';
     }
 
-    const updated = await request(`${attachmentsBaseUrl}${path}/${key}`, 'PATCH', {
-      elements: wanted,
-      required: body.required === true,
-    });
-    if (updated.status !== 200 && updated.status !== 202) {
-      throw new Error(`update ${key} attribute failed: ${describe(updated)}`);
+    // Appwrite 1.8.1 validates `default` as mandatory on this route even
+    // though `kind` is required and carries none — verified live: the payload
+    // the first draft sent answers 400 `Param "default" is not optional.`,
+    // while the same payload plus `default` passes route validation. Try null
+    // first so nothing gains a default, then the first element.
+    //
+    // Never throw from here: a failed reconcile must not abort the run and
+    // hide every attribute and index that follows it (and unlike the note
+    // collection, deleting `kind` would wipe the value on every attachment).
+    let updated: ApiResult | null = null;
+    for (const payload of [
+      { elements: wanted, required: body.required === true, default: null },
+      { elements: wanted, required: body.required === true, default: wanted[0] },
+    ]) {
+      updated = await request(`${attachmentsBaseUrl}${path}/${key}`, 'PATCH', payload);
+      if (updated.status === 200 || updated.status === 202) {
+        break;
+      }
     }
+
+    if (updated === null || (updated.status !== 200 && updated.status !== 202)) {
+      console.warn(
+        `[provision] could not reconcile enum ${key}: ${updated === null ? 'no response' : describe(updated)}`,
+      );
+      return 'failed';
+    }
+
     await waitForAttachmentsAttribute(key);
-    return true;
+    return 'updated';
   }
 
   const created = await request(`${attachmentsBaseUrl}${path}`, 'POST', body);
@@ -591,7 +611,7 @@ async function ensureAttachmentAttribute(
     throw new Error(`create ${key} attribute failed: ${describe(created)}`);
   }
   await waitForAttachmentsAttribute(key);
-  return true;
+  return 'created';
 }
 
 /**
@@ -636,8 +656,13 @@ async function ensureAttachmentsCollection(): Promise<StepOutcome> {
     ['ownerId', { key: 'ownerId', size: 36, required: true }, '/attributes/string'],
   ];
 
+  const failed: string[] = [];
+
   for (const [key, body, path] of attributes) {
-    if (await ensureAttachmentAttribute(key, body, path)) {
+    const result = await ensureAttachmentAttribute(key, body, path);
+    if (result === 'failed') {
+      failed.push(key);
+    } else if (result !== 'unchanged') {
       changes.push(`attr:${key}`);
     }
   }
@@ -671,11 +696,13 @@ async function ensureAttachmentsCollection(): Promise<StepOutcome> {
   return {
     step: 'collection.attachments',
     changed: changes.length > 0 || createdCollection,
-    fallback: false,
+    fallback: failed.length > 0,
     detail:
-      changes.length > 0
-        ? `applied ${changes.join(', ')}`
-        : 'attachments schema already present — skipped',
+      failed.length > 0
+        ? `could not reconcile ${failed.join(', ')} — remaining attributes and indexes were still ensured`
+        : changes.length > 0
+          ? `applied ${changes.join(', ')}`
+          : 'attachments schema already present — skipped',
   };
 }
 
