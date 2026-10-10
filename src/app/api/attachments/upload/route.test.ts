@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Attachment, AttachmentRecord } from '@/lib/appwrite/attachments';
 import { MAX_ATTACHMENT_BYTES } from '@/lib/attachments';
 import { performUpload, type UploadInput, type UploadResult } from '@/lib/attachment-flow';
-import { handleUpload, rejectOversizedBody, type UploadRouteDeps } from './route';
+import {
+  gateUploadRequest,
+  handleUpload,
+  rejectOversizedBody,
+  type UploadRouteDeps,
+} from './route';
 
 /**
  * RED seam for PR6 task 6.4 (spec `attachments` → "Oversized or wrong type"):
@@ -198,5 +203,54 @@ describe('rejectOversizedBody (pre-parse size gate)', () => {
     expect(rejectOversizedBody(null)).toBeNull();
     expect(rejectOversizedBody('no-es-un-numero')).toBeNull();
     expect(rejectOversizedBody('1024')).toBeNull();
+  });
+});
+
+describe('gateUploadRequest (identity and size are judged before the body)', () => {
+  /** Reading this body throws, so a gate that parses first fails the test. */
+  function requestWithPoisonBody(): Request {
+    const poison = new ReadableStream({
+      pull() {
+        throw new Error('the body was read before the session was checked');
+      },
+    });
+    return new Request('http://localhost/api/attachments/upload', {
+      method: 'POST',
+      body: poison,
+      duplex: 'half',
+    } as RequestInit);
+  }
+
+  it('answers 401 without a session and never reads the body', async () => {
+    const response = gateUploadRequest(null, requestWithPoisonBody());
+
+    expect(response?.status).toBe(401);
+    expect(String((await body(response as Response)).error)).toMatch(/sesi/i);
+  });
+
+  it('still rejects an oversized body before parsing when there is a session', async () => {
+    const request = new Request('http://localhost/api/attachments/upload', {
+      method: 'POST',
+      headers: { 'content-length': String(MAX_ATTACHMENT_BYTES * 2) },
+      body: 'payload',
+    });
+
+    const response = gateUploadRequest('user-owner', request);
+
+    expect(response?.status).toBe(400);
+    expect(String((await body(response as Response)).error)).toMatch(
+      /demasiado grande/i,
+    );
+  });
+
+  it('lets a normal session through to the parser', () => {
+    const request = new Request('http://localhost/api/attachments/upload', {
+      method: 'POST',
+      headers: { 'content-length': '1286' },
+      body: 'payload',
+    });
+
+    expect(gateUploadRequest('user-owner', request)).toBeNull();
+    expect(gateUploadRequest('user-owner', requestWithPoisonBody())).toBeNull();
   });
 });

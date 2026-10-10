@@ -116,18 +116,43 @@ export function rejectOversizedBody(contentLength: string | null): Response | nu
   return json({ error: ATTACHMENT_FAILURE_MESSAGES['too-large'] }, attachmentFailureStatus('too-large'));
 }
 
+/**
+ * Both gates that must run BEFORE `request.formData()`. Resolving the session
+ * first is what keeps a stale or absent cookie from buffering a 30 MB body
+ * only to answer 401 — the parser materialises the whole multipart into
+ * memory, so anything read after `formData()` is read too late.
+ *
+ * The `Content-Length` gate stays best-effort: a client is allowed to omit the
+ * header (HTTP/2 never requires it), and when it does we fall back to the
+ * post-parse cap in `validateAttachment` rather than failing a legitimate
+ * upload closed.
+ */
+export function gateUploadRequest(
+  sessionUserId: string | null,
+  request: Request,
+): Response | null {
+  if (sessionUserId === null) {
+    return json({ error: ATTACHMENT_FAILURE_MESSAGES['session-expired'] }, 401);
+  }
+  return rejectOversizedBody(request.headers.get('content-length'));
+}
+
 export async function POST(request: Request): Promise<Response> {
-  const tooLarge = rejectOversizedBody(request.headers.get('content-length'));
-  if (tooLarge !== null) {
-    return tooLarge;
+  const user = await getCurrentUser();
+  const secret = await getSessionSecret();
+
+  const gated = gateUploadRequest(
+    user === null || secret === null ? null : user.id,
+    request,
+  );
+  if (gated !== null) {
+    return gated;
   }
 
   const form = await request.formData();
   const file = await readFileEntry(form.get('file'));
   const recordId = String(form.get('recordId') ?? '');
 
-  const user = await getCurrentUser();
-  const secret = await getSessionSecret();
   const env = loadEnv();
 
   return handleUpload(
