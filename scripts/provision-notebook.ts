@@ -115,7 +115,13 @@ const ATTACHMENTS_BUCKET_ID = 'agenda-attachments';
 const ATTACHMENTS_COLLECTION_ID = 'attachments';
 /** Appwrite's 30 MB cap (decimal, matching the verified precedent buckets). */
 const MAX_ATTACHMENT_BYTES = 30000000;
-/** Design D3 allow-list: images jpeg/png/webp/heic + audio webm/mp3/wav/ogg/m4a/mp4/aac. */
+/**
+ * Must equal `ALLOWED_ATTACHMENT_EXTENSIONS` in `src/lib/attachments.ts`
+ * (images + audio + documents). Kept as a literal so this script stays free
+ * of app imports; `attachments.test.ts` parses this file and fails if the two
+ * lists ever drift — an older 12-entry copy here provisioned buckets that
+ * rejected every pdf/doc the picker offered.
+ */
 const ALLOWED_EXTENSIONS = [
   'jpg',
   'jpeg',
@@ -129,6 +135,11 @@ const ALLOWED_EXTENSIONS = [
   'm4a',
   'mp4',
   'aac',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
 ];
 
 const storageBucketsUrl = `${env.endpoint}/storage/buckets`;

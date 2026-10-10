@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  ALLOWED_ATTACHMENT_EXTENSIONS,
   ATTACHMENT_ACCEPT,
   ATTACHMENT_ERROR_MESSAGES,
   MAX_ATTACHMENT_BYTES,
@@ -252,5 +255,23 @@ describe('ATTACHMENT_ACCEPT (picker and validator share one allow-list)', () => 
       ok: false,
       reason: 'unsupported-type',
     });
+  });
+});
+
+describe('bucket allow-list (the provisioner cannot drift from the picker)', () => {
+  it('pins scripts/provision-notebook.ts at ALLOWED_ATTACHMENT_EXTENSIONS', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../../scripts/provision-notebook.ts', import.meta.url)),
+      'utf8',
+    );
+    const block = source.match(/const ALLOWED_EXTENSIONS = \[([\s\S]*?)\];/);
+
+    expect(block, 'ALLOWED_EXTENSIONS must stay a literal in the provisioner').not.toBeNull();
+    const bucketList = [...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map(
+      (entry) => entry[1],
+    );
+
+    expect(bucketList).toEqual([...ALLOWED_ATTACHMENT_EXTENSIONS]);
+    expect(bucketList).toHaveLength(ALLOWED_ATTACHMENT_EXTENSIONS.length);
   });
 });

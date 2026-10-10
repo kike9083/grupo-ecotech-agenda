@@ -70,14 +70,25 @@ const EXTENSION_MIME: Readonly<Record<string, string>> = {
 };
 
 /**
- * The `accept` attribute for the file input, DERIVED from the same extension
- * keys the server validates against: the picker can neither offer a type that
- * the route rejects (gif/bmp/flac via `image/*`) nor hide one it accepts
- * (heic/m4a/mp4). `image/*`/`audio/*` wildcards are deliberately avoided.
+ * The bucket's `allowedFileExtensions`, DERIVED from the same extension keys
+ * the validator walks. One source of truth for three consumers: the picker's
+ * `accept`, the validator, and `scripts/provision-notebook.ts` (which used to
+ * keep a 12-entry list of its own and provisioned buckets that rejected every
+ * document the picker offers). A test reads the provisioner and pins it here.
  */
-export const ATTACHMENT_ACCEPT: string = Object.keys(EXTENSION_MIME)
-  .map((extension) => `.${extension}`)
-  .join(',');
+export const ALLOWED_ATTACHMENT_EXTENSIONS: readonly string[] = Object.freeze(
+  Object.keys(EXTENSION_MIME),
+);
+
+/**
+ * The `accept` attribute for the file input: the picker can neither offer a
+ * type that the route rejects (gif/bmp/flac via `image/*`) nor hide one it
+ * accepts (heic/m4a/mp4). `image/*`/`audio/*` wildcards are deliberately
+ * avoided.
+ */
+export const ATTACHMENT_ACCEPT: string = ALLOWED_ATTACHMENT_EXTENSIONS.map(
+  (extension) => `.${extension}`,
+).join(',');
 
 /** Spanish copy shown inline by the upload form (spec → "inline Spanish error"). */
 export const ATTACHMENT_ERROR_MESSAGES: Record<AttachmentRejectionReason, string> = {
