@@ -19,6 +19,15 @@ import {
 import { typeLabel } from '@/lib/task-view';
 
 /**
+ * The types THIS form may create or edit. `note` is excluded on purpose: a
+ * note is authored in `NoteForm`, the only editor that writes `bodyHtml` and
+ * rebuilds `searchText` from the body. Minting one here would attach a
+ * required `time` and a `description`, and the first edit through `NoteForm`
+ * would drop that description out of the search index for good.
+ */
+const TASK_FORM_TYPES = TASK_TYPES.filter((type) => type !== 'note');
+
+/**
  * Create/edit task form (PR3 task 4.3): a client component wrapping a server
  * action with `useActionState` — validation failures re-render inline from
  * the returned state (field errors + banner) while the submitted values are
@@ -102,7 +111,7 @@ export function TaskForm({
           defaultValue={values.type ?? 'task'}
           className="field"
         >
-          {TASK_TYPES.map((option) => (
+          {TASK_FORM_TYPES.map((option) => (
             <option key={option} value={option}>
               {typeLabel(option)}
             </option>
