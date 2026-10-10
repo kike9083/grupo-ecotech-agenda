@@ -1,6 +1,6 @@
 import { toDomainError, type DomainErrorKind } from '@/lib/appwrite/errors';
 import type { Task } from '@/lib/appwrite/tasks';
-import { plainTextFromHtml } from '@/lib/rich-text';
+import { plainTextFromHtml, normalizeNoteBodyHtml } from '@/lib/rich-text';
 import {
   buildNoteRecord,
   validateNoteDraft,
@@ -82,10 +82,16 @@ export async function performCreateNote(
     return;
   }
 
-  const bodyText = plainTextFromHtml(result.value.bodyHtml);
+  // A cleared Tiptap document arrives as `<p></p>`; store it as `''` so the
+  // list renders its empty state instead of a blank content block.
+  const value = {
+    ...result.value,
+    bodyHtml: normalizeNoteBodyHtml(result.value.bodyHtml),
+  };
+  const bodyText = plainTextFromHtml(value.bodyHtml);
 
   try {
-    await deps.createNote(buildNoteRecord(result.value, owner, bodyText));
+    await deps.createNote(buildNoteRecord(value, owner, bodyText));
   } catch (error) {
     const domain = toDomainError(error);
     if (domain.kind === 'session-expired') {

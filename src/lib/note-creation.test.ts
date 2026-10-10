@@ -159,6 +159,21 @@ describe('performCreateNote (spec note-capture → Note creation)', () => {
     expect(deps.redirects).toEqual([NOTE_SUCCESS_REDIRECT]);
   });
 
+  it('stores a cleared editor document as an empty body', async () => {
+    const fake = new FakeDatabases();
+    const deps = makeDeps(fake);
+
+    await performCreateNote(
+      deps,
+      { title: 'Vacía', bodyHtml: '<p></p>' },
+      owner,
+    );
+
+    expect(fake.createCalls[0].data.bodyHtml).toBe('');
+    expect(fake.createCalls[0].data.searchText).toBe('Vacía ');
+    expect(deps.redirects).toEqual([NOTE_SUCCESS_REDIRECT]);
+  });
+
   it('blocks an invalid draft with Spanish field errors and never writes', async () => {
     const fake = new FakeDatabases();
     const deps = makeDeps(fake);

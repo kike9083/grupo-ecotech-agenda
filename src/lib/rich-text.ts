@@ -95,3 +95,13 @@ export function plainTextFromHtml(html: string): string {
 
   return decoded.replace(/\s+/g, ' ').trim();
 }
+
+/**
+ * Normalizes a stored note body: Tiptap emits `<p></p>` for a document the
+ * user has cleared, which is not "empty" for `resolveNoteBodyState` — the
+ * list would render a blank content block instead of the empty state. Writing
+ * `''` keeps the stored value canonical from the first save onward.
+ */
+export function normalizeNoteBodyHtml(html: string): string {
+  return plainTextFromHtml(html) === '' ? '' : html;
+}

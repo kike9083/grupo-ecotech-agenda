@@ -114,6 +114,21 @@ describe('performUpdateNote', () => {
     expect(deps.redirects).toEqual([NOTE_UPDATE_SUCCESS_REDIRECT]);
   });
 
+  it('stores a cleared editor document as an empty body', async () => {
+    const deps = makeDeps();
+
+    await performUpdateNote(
+      deps,
+      { documentId: 'doc-1', createdBy: 'user-123' },
+      { ...validDraft, bodyHtml: '<p></p>' },
+    );
+
+    expect(deps.invalid).toEqual([]);
+    expect(deps.updates[0].record.bodyHtml).toBe('');
+    expect(deps.updates[0].record.searchText).toBe('Acuerdo de octubre ');
+    expect(deps.redirects).toEqual([NOTE_UPDATE_SUCCESS_REDIRECT]);
+  });
+
   it('accepts a note with no time — the task path rejects exactly this draft', async () => {
     const deps = makeDeps();
 

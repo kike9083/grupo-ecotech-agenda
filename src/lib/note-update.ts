@@ -1,7 +1,7 @@
 import { toDomainError, type DomainErrorKind } from '@/lib/appwrite/errors';
 import type { Task } from '@/lib/appwrite/tasks';
 import { SESSION_EXPIRED_REDIRECT } from '@/lib/note-creation';
-import { plainTextFromHtml } from '@/lib/rich-text';
+import { normalizeNoteBodyHtml, plainTextFromHtml } from '@/lib/rich-text';
 import {
   buildNoteUpdate,
   validateNoteDraft,
@@ -114,10 +114,17 @@ export async function performUpdateNote(
     return;
   }
 
+  // A cleared Tiptap document arrives as `<p></p>`; store it as `''` so the
+  // list renders its empty state instead of a blank content block.
+  const value = {
+    ...result.value,
+    bodyHtml: normalizeNoteBodyHtml(result.value.bodyHtml),
+  };
+
   try {
     await deps.updateNote(
       input.documentId,
-      buildNoteUpdate(result.value, plainTextFromHtml(result.value.bodyHtml)),
+      buildNoteUpdate(value, plainTextFromHtml(value.bodyHtml)),
     );
   } catch (error) {
     const domain = toDomainError(error);

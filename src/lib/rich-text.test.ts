@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { plainTextFromHtml, sanitizeNoteHtml } from './rich-text';
+import {
+  normalizeNoteBodyHtml,
+  plainTextFromHtml,
+  sanitizeNoteHtml,
+} from './rich-text';
 
 describe('plainTextFromHtml (spec note-capture → Plain-text search index)', () => {
   it('keeps inline text and drops the tags', () => {
@@ -90,5 +94,21 @@ describe('sanitizeNoteHtml (spec note-capture → Rich-text body and sanitizatio
     expect(clean).toContain('href="https://example.test"');
     expect(clean).not.toContain('style');
     expect(clean).not.toContain('position:fixed');
+  });
+});
+
+describe('normalizeNoteBodyHtml (cleared Tiptap documents)', () => {
+  it('collapses an emptied editor document to the empty string', () => {
+    expect(normalizeNoteBodyHtml('<p></p>')).toBe('');
+    expect(normalizeNoteBodyHtml('<p><br></p>')).toBe('');
+    expect(normalizeNoteBodyHtml('')).toBe('');
+    expect(normalizeNoteBodyHtml('   ')).toBe('');
+  });
+
+  it('keeps a body that still carries text', () => {
+    expect(normalizeNoteBodyHtml('<p>Hola</p>')).toBe('<p>Hola</p>');
+    expect(normalizeNoteBodyHtml('<p> </p><p>Hola</p>')).toBe(
+      '<p> </p><p>Hola</p>',
+    );
   });
 });
