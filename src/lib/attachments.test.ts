@@ -275,3 +275,34 @@ describe('bucket allow-list (the provisioner cannot drift from the picker)', () 
     expect(bucketList).toHaveLength(ALLOWED_ATTACHMENT_EXTENSIONS.length);
   });
 });
+
+/**
+ * Round-4 CRITICAL: `kind` was provisioned as ['image','audio'] while the
+ * validator answers 'document' for pdf/doc/xls — so a freshly created
+ * collection rejected every document the picker offered, with the storage file
+ * rolled back. An existing bucket was also never updated back onto the
+ * allow-list. Both shapes are pinned here so the drift fails this suite
+ * instead of an upload in a new environment.
+ */
+describe('provisioner schema (a fresh environment matches the one in production)', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('../../scripts/provision-notebook.ts', import.meta.url)),
+    'utf8',
+  );
+
+  it('provisions kind with every value the validator can emit', () => {
+    const line = /\['kind',[^\n]+/.exec(source)?.[0] ?? '';
+    const elements = [...(/elements:\s*\[([^\]]*)\]/.exec(line)?.[1] ?? '').matchAll(
+      /'([^']+)'/g,
+    )].map((entry) => entry[1]);
+
+    expect(elements).toEqual(['image', 'audio', 'document']);
+    expect(elements).toContain(kindFromMime('application/pdf'));
+  });
+
+  it('caps the bucket at the same byte constant the route enforces', () => {
+    const pins = source.match(/maximumFileSize: MAX_ATTACHMENT_BYTES/g) ?? [];
+    expect(pins.length, 'createBucket and updateBucket must both be pinned').toBeGreaterThanOrEqual(2);
+    expect(MAX_ATTACHMENT_BYTES).toBe(30_000_000);
+  });
+});

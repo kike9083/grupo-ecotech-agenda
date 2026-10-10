@@ -248,6 +248,7 @@ async function waitForIndex(key: string): Promise<void> {
 interface CollectionAttributeSummary {
   key: string;
   status?: string;
+  elements?: string[];
 }
 
 interface CollectionIndexSummary {
@@ -481,11 +482,50 @@ async function ensureAttachmentsBucket(): Promise<StepOutcome> {
     'GET',
   );
   if (existing.status === 200) {
+    const bucket = (
+      existing.body as { bucket?: Record<string, unknown> }
+    ).bucket ?? (existing.body as Record<string, unknown>);
+
+    const currentExtensions = Array.isArray(bucket.allowedFileExtensions)
+      ? (bucket.allowedFileExtensions as string[])
+      : [];
+    const inSync =
+      bucket.maximumFileSize === MAX_ATTACHMENT_BYTES &&
+      currentExtensions.length === ALLOWED_EXTENSIONS.length &&
+      ALLOWED_EXTENSIONS.every((entry) => currentExtensions.includes(entry));
+
+    if (inSync) {
+      return {
+        step: 'bucket.agenda-attachments',
+        changed: false,
+        fallback: false,
+        detail: 'bucket already present and in sync — skipped',
+      };
+    }
+
+    // An existing bucket still carries the old 12-extension allow-list, so
+    // `.pdf` would 404 at storage level even though the validator says yes.
+    const updated = await request(
+      `${storageBucketsUrl}/${ATTACHMENTS_BUCKET_ID}`,
+      'PUT',
+      {
+        name: typeof bucket.name === 'string' ? bucket.name : 'Agenda attachments',
+        permissions: Array.isArray(bucket.permissions) ? bucket.permissions : [],
+        fileSecurity: bucket.fileSecurity === true,
+        enabled: bucket.enabled !== false,
+        maximumFileSize: MAX_ATTACHMENT_BYTES,
+        allowedFileExtensions: ALLOWED_EXTENSIONS,
+      },
+    );
+    if (updated.status !== 200 && updated.status !== 202) {
+      throw new Error(`updateBucket failed: ${describe(updated)}`);
+    }
+
     return {
       step: 'bucket.agenda-attachments',
-      changed: false,
+      changed: true,
       fallback: false,
-      detail: 'bucket already present — skipped',
+      detail: `updateBucket OK — extensions ${currentExtensions.length} → ${ALLOWED_EXTENSIONS.length} (${describe(updated)})`,
     };
   }
   if (existing.status !== 404) {
@@ -519,8 +559,31 @@ async function ensureAttachmentAttribute(
   path: string,
 ): Promise<boolean> {
   const attributes = await getAttachmentsAttributes();
-  if (attributes.some((entry) => entry.key === key)) {
-    return false;
+  const existing = attributes.find((entry) => entry.key === key);
+
+  if (existing !== undefined) {
+    // Enum drift: `kind` was first provisioned as ['image','audio'], so a
+    // freshly created collection rejected every pdf/doc/xls the picker offers.
+    // Comparing (instead of skipping) is what repairs it — a fresh bucket and
+    // a fresh collection must converge on the same shape every run.
+    if (path !== '/attributes/enum' || !Array.isArray(existing.elements)) {
+      return false;
+    }
+    const wanted = body.elements as string[];
+    const missing = wanted.filter((value) => !existing.elements?.includes(value));
+    if (missing.length === 0) {
+      return false;
+    }
+
+    const updated = await request(`${attachmentsBaseUrl}${path}/${key}`, 'PATCH', {
+      elements: wanted,
+      required: body.required === true,
+    });
+    if (updated.status !== 200 && updated.status !== 202) {
+      throw new Error(`update ${key} attribute failed: ${describe(updated)}`);
+    }
+    await waitForAttachmentsAttribute(key);
+    return true;
   }
 
   const created = await request(`${attachmentsBaseUrl}${path}`, 'POST', body);
@@ -566,7 +629,7 @@ async function ensureAttachmentsCollection(): Promise<StepOutcome> {
   const attributes: Array<[string, Record<string, unknown>, string]> = [
     ['recordId', { key: 'recordId', size: 36, required: true }, '/attributes/string'],
     ['fileId', { key: 'fileId', size: 36, required: true }, '/attributes/string'],
-    ['kind', { key: 'kind', elements: ['image', 'audio'], required: true }, '/attributes/enum'],
+    ['kind', { key: 'kind', elements: ['image', 'audio', 'document'], required: true }, '/attributes/enum'],
     ['name', { key: 'name', size: 255, required: true }, '/attributes/string'],
     ['mimeType', { key: 'mimeType', size: 100, required: true }, '/attributes/string'],
     ['size', { key: 'size', required: true, min: 0, max: MAX_ATTACHMENT_BYTES }, '/attributes/integer'],
